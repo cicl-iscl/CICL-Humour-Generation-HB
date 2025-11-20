@@ -1,0 +1,68 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36" version="29.0.3">
+  <diagram name="Page-1" id="bIX8MJJpdAznw08DJu3G">
+    <mxGraphModel dx="1269" dy="809" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-3" value="Reward&lt;div&gt;Model&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;align=left;verticalAlign=top;labelPosition=center;verticalLabelPosition=middle;spacingTop=20;spacingLeft=20;" vertex="1" parent="1">
+          <mxGeometry x="355" y="339" width="260" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0;exitDx=0;exitDy=52.5;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-1" target="IKmAWl8jJf_I2hEm9fEN-5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="780" y="169" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-1" value="LLM generated jokes" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="595" y="119" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-2" value="RoBERTa-based&lt;div&gt;classifier&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="435" y="379" width="130" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-3" target="IKmAWl8jJf_I2hEm9fEN-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-4" value="Other reward functions (e.g. word-pair check)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="435" y="459" width="130" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-5" value="LLM&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#76608a;strokeColor=#432D57;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="675" y="249" width="70" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-3" target="IKmAWl8jJf_I2hEm9fEN-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0;exitY=0;exitDx=0;exitDy=52.5;exitPerimeter=0;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-8" target="IKmAWl8jJf_I2hEm9fEN-5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="720" y="129" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="745" y="179" />
+              <mxPoint x="710" y="179" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-8" value="Human generated jokes" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="735" y="119" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-11" target="IKmAWl8jJf_I2hEm9fEN-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-11" value="Jokes with LLM generated ratings&amp;nbsp;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="665" y="369" width="90" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-5" target="IKmAWl8jJf_I2hEm9fEN-11">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="705" y="279" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-18" value="Qwen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="140" y="394" width="150" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-28" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="IKmAWl8jJf_I2hEm9fEN-22" target="IKmAWl8jJf_I2hEm9fEN-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IKmAWl8jJf_I2hEm9fEN-22" value="Prompt" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="155" y="259" width="120" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
