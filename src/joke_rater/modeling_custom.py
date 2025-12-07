@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import XLMRobertaPreTrainedModel, XLMRobertaModel, XLMRobertaConfig
 
+
 class HierarchicalConfig(XLMRobertaConfig):
     model_type = "xlm-roberta-joke-rater" 
     def __init__(self, num_child_labels=10, class_weights_binary=None, class_weights_child=None, **kwargs):
@@ -9,6 +10,7 @@ class HierarchicalConfig(XLMRobertaConfig):
         self.num_child_labels = num_child_labels
         self.class_weights_binary = class_weights_binary
         self.class_weights_child = class_weights_child
+
 
 class HierarchicalClassifier(XLMRobertaPreTrainedModel):
     """
