@@ -1,6 +1,7 @@
 import argparse
 import os
 import torch
+import weave
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
@@ -35,7 +36,7 @@ def main():
     
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
-        device_map="auto",
+        device_map="cuda" if torch.cuda.is_available() else "cpu",
         torch_dtype=torch.bfloat16, 
     )
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
@@ -84,7 +85,9 @@ def main():
     print("Starting GRPO training...")
     try:
         import wandb
-        wandb.init(project="huggingface", config=args)
+        accelerator = trainer.accelerator
+        if accelerator.is_main_process:
+            wandb.init(project="huggingface", config=args)
     except Exception as e:
         print(f"Could not initialize wandb/weave. Training will continue without detailed logging. Error: {e}")
         
