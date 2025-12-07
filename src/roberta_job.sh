@@ -13,8 +13,13 @@
 
 
 module load devel/cuda/12.8
-module load devel/python/3.11.7-gnu-11.4 
+module load devel/python/3.13.3-llvm-19.1
 echo "CUDA Home: $CUDA_HOME"
+
+export ACCELERATE_USE_NCCL=1
+export NCCL_ASYNC_INIT=0
+export TORCH_DISTRIBUTED_DETAIL=DEBUG
+export CUDA_LAUNCH_BLOCKING=1
 
 # Define Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
