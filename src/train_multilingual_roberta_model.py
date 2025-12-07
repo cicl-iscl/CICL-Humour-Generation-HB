@@ -138,7 +138,6 @@ if __name__ == "__main__":
         learning_rate=LEARNING_RATE,
         eval_strategy="epoch",
         save_strategy="no",
-        fp16=True,
         warmup_ratio=0.1,
         weight_decay=0.01,
         report_to="wandb",
