@@ -71,7 +71,6 @@ def main():
         save_strategy="no",
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
-        report_to="wandb"
     )
 
     trainer = GRPOTrainer(
