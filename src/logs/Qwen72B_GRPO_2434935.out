@@ -1,0 +1,17 @@
+
+Starting distributed training on 1 node(s) with 4 GPUs...
+
+============================= JOB FEEDBACK =============================
+
+NodeName=uc2n916
+Job ID: 2434935
+Cluster: uc3
+User/Group: tu_zxoqp65/tu_tu
+State: FAILED (exit code 1)
+Nodes: 1
+Cores per node: 32
+CPU Utilized: 00:00:17
+CPU Efficiency: 0.49% of 00:57:36 core-walltime
+Job Wall-clock time: 00:01:48
+Memory Utilized: 592.28 MB
+Memory Efficiency: 0.46% of 125.00 GB (125.00 GB/node)

@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=Qwen72B_GRPO
-#SBATCH --partition=gpu_h100_il
+#SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1  
 #SBATCH --ntasks=1           
 #SBATCH --cpus-per-task=32   
-#SBATCH --gres=gpu:4     
-#SBATCH --time=8:00:00 
+#SBATCH --gres=gpu:2
+#SBATCH --time=8:00:00
 #SBATCH --output=logs/%x_%j.out      
 #SBATCH --error=logs/%x_%j.err       
 #SBATCH --mail-type=ALL
@@ -14,7 +14,7 @@
 # NOTE: --mem flags are omitted per bwUniCluster documentation.
 
 # 1. Load Modules (Ensure you load the exact versions available)
-module load cuda/12.1
+module load devel/cuda/12.8
 module load python/3.11 
 
 # 2. Define your Project Root (VERY IMPORTANT: Set this variable)
@@ -30,7 +30,7 @@ cd src
 # 5. Execute the Training (using 4 processes for 4 GPUs)
 echo "Starting distributed training on $SLURM_JOB_NUM_NODES node(s) with 4 GPUs..."
 
-accelerate launch --num_processes 4 train_qwen_grpo.py \
+accelerate launch --num_processes 2 train_qwen_grpo.py \
     --model_id "Qwen/Qwen2.5-72B-Instruct" \
     --output_dir "./checkpoints/qwen72b_grpo_run_01" \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
