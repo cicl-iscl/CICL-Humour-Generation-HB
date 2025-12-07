@@ -16,10 +16,10 @@
 
 # 1. Load Modules
 module load cuda/12.1
-module load miniconda/3
+module load python/3.11
 
 # 2. Activate Environment
-source ~/.venv/bin/activate
+source ~/hpc_envs/qwen_grpo_env/bin/activate
 
 # 3. Debugging Info
 echo "Job running on node: $SLURMD_NODENAME"
