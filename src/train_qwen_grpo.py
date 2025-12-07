@@ -52,7 +52,7 @@ def main():
         coherence_penalty
     ]
     reward_weights = [1.0, 2.0, 1.0, 0.5, 0.5, 1.0, 1.0]
-
+    model_name = args.model_id.split("/")[-1] + "-Jokester"
     # Configure GRPO Training (matching cell 10)
     training_args = GRPOConfig(
         output_dir=args.output_dir, 
@@ -71,6 +71,8 @@ def main():
         save_strategy="no",
         #per_device_train_batch_size=args.per_device_train_batch_size,
         #per_device_eval_batch_size=args.per_device_eval_batch_size,
+        push_to_hub=True, 
+        hub_model_id=f"KonradBRG/{model_name}"
     )
 
     trainer = GRPOTrainer(
