@@ -34,7 +34,7 @@ echo "Starting distributed training on 1 node(s) with 4 GPUs using accelerate...
 accelerate launch \
     --num_processes 4 \
     train_multilingual_roberta_model.py \
-    --model_name "xlm-roberta-base" \
+    --model_name "xlm-roberta-large" \
     --output_dir "./results/joke_rater" \
     --hub_model_id "KonradBRG/joke-rater-xlm-roberta" \
     --num_train_epochs 200 \
