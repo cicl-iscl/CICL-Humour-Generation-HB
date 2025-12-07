@@ -33,8 +33,8 @@ class HierarchicalClassifier(XLMRobertaPreTrainedModel):
         self.binary_head = nn.Linear(h//2, 2)
         self.child_head = nn.Linear(h//2, num_child_labels)
 
-        self.a = nn.Parameter(torch.tensor(0.5, dtype=torch.float))
-        self.b = nn.Parameter(torch.tensor(0.5, dtype=torch.float))
+        self.a = nn.Parameter(torch.tensor([0.5], dtype=torch.float))
+        self.b = nn.Parameter(torch.tensor([0.5], dtype=torch.float))
         
         self.loss_bin = nn.CrossEntropyLoss(weight=class_weights_binary)
         self.loss_child = nn.CrossEntropyLoss(weight=class_weights_child)
