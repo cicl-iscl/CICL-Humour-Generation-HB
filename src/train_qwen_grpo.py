@@ -62,15 +62,15 @@ def main():
         vllm_mode=None,
         max_completion_length=args.max_completion_length,
         temperature=0.5,
-        generation_batch_size=args.generation_batch_size,
-        num_generations=args.num_generations,
+        #generation_batch_size=args.generation_batch_size,
+        #num_generations=args.num_generations,
         reward_weights=reward_weights,
         learning_rate=args.learning_rate,
         logging_steps=10,
         eval_strategy="epoch",
         save_strategy="no",
-        per_device_train_batch_size=args.per_device_train_batch_size,
-        per_device_eval_batch_size=args.per_device_eval_batch_size,
+        #per_device_train_batch_size=args.per_device_train_batch_size,
+        #per_device_eval_batch_size=args.per_device_eval_batch_size,
     )
 
     trainer = GRPOTrainer(
