@@ -1,3 +1,4 @@
+import emoji
 import re
 from collections import deque
 import torch
