@@ -31,6 +31,13 @@ def main():
     except Exception as e:
         print(f"Error loading datasets. Ensure the paths are correct. Error: {e}")
         return
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_id,
+        device_map="cpu",
+        torch_dtype=torch.bfloat16, 
+    )
+    tokenizer = AutoTokenizer.from_pretrained(args.model_id)
 
     # Define Reward Function List and Weights (matching cell 10)
     reward_fns = [
@@ -65,7 +72,8 @@ def main():
     )
 
     trainer = GRPOTrainer(
-        model=args.model_id,
+        model=model,
+        processing_class=tokenizer,
         reward_funcs=reward_fns,
         args=training_args,
         train_dataset=train_dataset,
