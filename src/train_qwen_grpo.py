@@ -36,7 +36,7 @@ def main():
     
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
-        device_map="auto",
+        device_map=None, # let FSDP handle device placement
         torch_dtype=torch.bfloat16, 
     )
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
@@ -71,6 +71,7 @@ def main():
         save_strategy="no",
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
+        report_to="wandb"
     )
 
     trainer = GRPOTrainer(
@@ -83,14 +84,6 @@ def main():
     )
     
     print("Starting GRPO training...")
-    try:
-        import wandb
-        accelerator = trainer.accelerator
-        if accelerator.is_main_process:
-            wandb.init(project="huggingface", config=args)
-    except Exception as e:
-        print(f"Could not initialize wandb/weave. Training will continue without detailed logging. Error: {e}")
-        
     trainer.train()
     print("Training complete.")
     print("\n--- Example Joke Generation Post-Training ---")

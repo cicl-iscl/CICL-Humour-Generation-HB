@@ -20,8 +20,8 @@ echo "CUDA Home: $CUDA_HOME"
 
 export ACCELERATE_USE_NCCL=1
 export NCCL_ASYNC_INIT=0
-export TORCH_DISTRIBUTED_DETAIL=DEBUG
-export CUDA_LAUNCH_BLOCKING=1
+export NCCL_DEBUG=INFO
+### export CUDA_LAUNCH_BLOCKING=1
 
 # 2. Define your Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
@@ -36,11 +36,16 @@ cd src
 # 5. Execute the Training (using 4 processes for 4 GPUs)
 echo "Starting distributed training on $SLURM_JOB_NUM_NODES node(s) with 4 GPUs..."
 
-accelerate launch --num_processes 2 train_qwen_grpo.py \
+accelerate launch \
+    --num_processes 2 \
+    --multi_gpu \
+    --mixed_precision bf16 \
+    train_qwen_grpo.py \
     --model_id "Qwen/Qwen2.5-72B-Instruct" \
     --output_dir "./checkpoints/qwen72b_grpo_run_01" \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
     --num_train_epochs 1 \
     --learning_rate 1e-6 \
-    --per_device_train_batch_size 4
+    --per_device_train_batch_size 1 \
+    --generation_batch_size 1
