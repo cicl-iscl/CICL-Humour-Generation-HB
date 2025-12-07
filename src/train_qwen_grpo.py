@@ -1,5 +1,6 @@
 import argparse
 import os
+import torch
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
