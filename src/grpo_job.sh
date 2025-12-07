@@ -18,11 +18,11 @@ module load devel/cuda/12.8
 module load devel/python/3.11.7-gnu-11.4 
 echo "CUDA Home: $CUDA_HOME"
 
-# 2. Define your Project Root (VERY IMPORTANT: Set this variable)
+# 2. Define your Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
 
 # 3. Activate the UV Environment
-source $PROJECT_ROOT/.venv/bin/activate
+source $PROJECT_ROOT/src/.venv/bin/activate
 
 # 4. Change to the Project Root (Ensures script runs from the correct location)
 cd $PROJECT_ROOT
