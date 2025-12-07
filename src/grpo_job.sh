@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=Qwen72B_GRPO
 #SBATCH --partition=gpu_a100_il
-#SBATCH --nodes=1  
-#SBATCH --ntasks=1           
-#SBATCH --cpus-per-task=32   
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:2
-#SBATCH --time=8:00:00
-#SBATCH --output=logs/%x_%j.out      
-#SBATCH --error=logs/%x_%j.err       
+#SBATCH --time=4:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
@@ -15,7 +15,8 @@
 
 # 1. Load Modules (Ensure you load the exact versions available)
 module load devel/cuda/12.8
-module load python/3.11 
+module load devel/python/3.11.7-gnu-11.4 
+echo "CUDA Home: $CUDA_HOME"
 
 # 2. Define your Project Root (VERY IMPORTANT: Set this variable)
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
