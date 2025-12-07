@@ -24,12 +24,12 @@ export CUDA_LAUNCH_BLOCKING=1
 # Define Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
 
-# Change to the Project Root
-cd $PROJECT_ROOT
-
 # Activate the UV Environment (Must be done after module loading)
 source $PROJECT_ROOT/src/.venv/bin/activate
 echo "Starting distributed training on 1 node(s) with 4 GPUs using accelerate..."
+
+cd $PROJECT_ROOT
+cd src
 
 accelerate launch \
     --num_processes 4 \
