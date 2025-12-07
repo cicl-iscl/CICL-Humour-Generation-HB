@@ -33,6 +33,8 @@ echo "Starting distributed training on $SLURM_JOB_NUM_NODES node(s) with 4 GPUs.
 accelerate launch --num_processes 4 train_qwen_grpo.py \
     --model_id "Qwen/Qwen2.5-72B-Instruct" \
     --output_dir "./checkpoints/qwen72b_grpo_run_01" \
+    --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
+    --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
     --num_train_epochs 1 \
     --learning_rate 1e-6 \
     --per_device_train_batch_size 4
