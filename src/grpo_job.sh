@@ -1,33 +1,36 @@
 #!/bin/bash
-#SBATCH --job-name=grpo_humor
-#SBATCH --partition=gpu_h100
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:4
-#SBATCH --time=04:00:00
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
-
+#SBATCH --job-name=Qwen72B_GRPO
+#SBATCH --partition=gpu_h100_il
+#SBATCH --nodes=1  
+#SBATCH --ntasks=1           
+#SBATCH --cpus-per-task=32   
+#SBATCH --gres=gpu:4     
+#SBATCH --time=8:00:00 
+#SBATCH --output=logs/%x_%j.out      
+#SBATCH --error=logs/%x_%j.err       
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# NOTE: Memory flags (--mem) are omitted as per cluster documentation instructions.
+# NOTE: --mem flags are omitted per bwUniCluster documentation.
 
-# 1. Load Modules
+# 1. Load Modules (Ensure you load the exact versions available)
 module load cuda/12.1
-module load python/3.11
+module load python/3.11 
 
-# 2. Activate Environment
-source ~/hpc_envs/qwen_grpo_env/bin/activate
+# 2. Define your Project Root (VERY IMPORTANT: Set this variable)
+PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
 
-# 3. Debugging Info
-echo "Job running on node: $SLURMD_NODENAME"
-echo "GPUs allocated: $CUDA_VISIBLE_DEVICES"
+# 3. Activate the UV Environment
+source $PROJECT_ROOT/.venv/bin/activate
 
-# 4. Run the Training using Accelerate Launch
-# Must launch 4 processes to match the 4 GPUs.
-accelerate launch --num_processes 4 run_grpo_training.py \
+# 4. Change to the Project Root (Ensures script runs from the correct location)
+cd $PROJECT_ROOT
+cd src
+
+# 5. Execute the Training (using 4 processes for 4 GPUs)
+echo "Starting distributed training on $SLURM_JOB_NUM_NODES node(s) with 4 GPUs..."
+
+accelerate launch --num_processes 4 train_qwen_grpo.py \
     --model_id "Qwen/Qwen2.5-72B-Instruct" \
     --output_dir "./checkpoints/qwen72b_grpo_run_01" \
     --num_train_epochs 1 \
