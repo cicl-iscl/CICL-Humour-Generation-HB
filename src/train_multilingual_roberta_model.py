@@ -143,6 +143,7 @@ if __name__ == "__main__":
         report_to="wandb",
         push_to_hub=True,
         hub_model_id=HUB_MODEL_ID,
+        optim="adamw_torch",
     )
 
     # Initialize and Run Trainer
