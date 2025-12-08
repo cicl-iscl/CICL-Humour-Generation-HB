@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
@@ -32,7 +32,7 @@ cd $PROJECT_ROOT
 cd src
 
 accelerate launch \
-    --num_processes 4 \
+    --num_processes 2 \
     train_multilingual_roberta_model.py \
     --model_name "xlm-roberta-large" \
     --output_dir "./results/joke_rater" \

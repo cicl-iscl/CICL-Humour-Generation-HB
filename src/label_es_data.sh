@@ -38,7 +38,7 @@ echo "Starting joke evaluation using accelerate on 1 GPU..."
 accelerate launch \
     --num_processes 2 \
     --mixed_precision bf16 \
-    labeling_llama_eval.py \
+    labeling/llama_eval_es.py \
     --model_name "meta-llama/Llama-3.1-8B-Instruct" \
     --batch_size 16 \
     --output_file "../data/es_data_labeled_llama3.1.csv"
