@@ -47,7 +47,6 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
         torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
         # Don't use device_map with FSDP - it handles placement
     )
 
