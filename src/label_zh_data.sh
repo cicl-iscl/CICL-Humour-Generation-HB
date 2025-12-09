@@ -27,13 +27,10 @@ source $PROJECT_ROOT/src/.venv/bin/activate
 cd $PROJECT_ROOT/src
 mkdir -p logs
 
-# 4. Execute the Evaluation Script
+# 4. Execute the Evaluation Script (simple python, no accelerate needed for single GPU)
 echo "Starting Chinese joke evaluation on 1 GPU..."
 
-accelerate launch \
-    --num_processes 1 \
-    --mixed_precision bf16 \
-    labeling/qwen_eval_zh.py \
+python labeling/qwen_eval_zh.py \
     --model_name "Orion-zhen/Qwen2.5-7B-Instruct-Uncensored" \
     --batch_size 8 \
     --output_file "../data/zh_data_labeled_qwen7b.csv"

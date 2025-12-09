@@ -1,13 +1,11 @@
 import pandas as pd
 import torch
-import os
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM
-from accelerate import Accelerator
-from torch.utils.data import DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from torch.utils.data import DataLoader, Dataset
 
 # Import shared utilities
-from eval_utils import parse_args, ListDataset, get_rating, collate_fn
+from eval_utils import parse_args, get_rating
 
 # --- 1. PROMPT & MODEL CONFIG ---
 
@@ -23,110 +21,113 @@ PROMPT_ZH = """
 {}
 """
 
-# The exact prefix for Qwen models
-ASSISTANT_PREFIX = "<|im_start|>assistant\n" 
+ASSISTANT_PREFIX = "<|im_start|>assistant\n"
+
+
+class JokeDataset(Dataset):
+    """Simple dataset for joke evaluation."""
+    def __init__(self, prompts, tokenizer):
+        self.prompts = prompts
+        self.tokenizer = tokenizer
+
+    def __len__(self):
+        return len(self.prompts)
+
+    def __getitem__(self, i):
+        messages = [{"role": "user", "content": self.prompts[i]}]
+        return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+
+def collate_fn(batch, tokenizer):
+    return tokenizer(batch, padding=True, truncation=True, return_tensors="pt")
+
 
 # --- 2. MAIN EXECUTION ---
 
 def main():
     """Main function to run the joke evaluation."""
     args = parse_args()
-    
+
     # 1. Load Data
-    print("📥 Loading jokes from zh_jokes.csv...")
+    print("Loading jokes from zh_jokes.csv...")
     try:
-        # NOTE: Ensure zh_jokes.csv is in the current working directory or provide the full path
         zh_joke_df = pd.read_csv("../data/zh_jokes.csv")
     except FileNotFoundError:
-        print("Error: zh_jokes.csv not found. Please ensure it's in the correct directory.")
+        print("Error: zh_jokes.csv not found.")
         return
 
     jokes_combined = zh_joke_df.joke.to_list()
     print(f"Total jokes loaded: {len(jokes_combined)}")
-    
-    # Pre-format the jokes with the detailed prompt
+
     eval_prompts = [PROMPT_ZH.format(joke) for joke in jokes_combined]
 
-    # 2. Setup Model, Tokenizer, and Accelerator
-    print(f"🤖 Initializing model: {args.model_name}...")
+    # 2. Setup Model and Tokenizer (simple single-GPU setup)
+    print(f"Initializing model: {args.model_name}...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    accelerator = Accelerator(mixed_precision="bf16")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-    # Initialize dataset and get the tokenizer used within it
-    eval_dataset = ListDataset(eval_prompts, args.model_name)
-    tokenizer = eval_dataset.tokenizer
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+        trust_remote_code=True
+    )
+    model.eval()
 
     # 3. Prepare DataLoader
-    data_loader_collate_fn = lambda batch: collate_fn(batch, tokenizer)
-
+    eval_dataset = JokeDataset(eval_prompts, tokenizer)
     eval_dataloader = DataLoader(
         eval_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        collate_fn=data_loader_collate_fn,
-        num_workers=4,
-        pin_memory=True,
+        collate_fn=lambda batch: collate_fn(batch, tokenizer),
     )
-
-    # Initialize model - let Accelerate handle device placement
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True
-    )
-
-    # Prepare for acceleration - this handles device placement
-    model, eval_dataloader = accelerator.prepare(model, eval_dataloader)
 
     # 4. Inference Loop
-    print(f"🚀 Starting accelerated inference with batch size {args.batch_size}...")
-    
+    print(f"Starting inference with batch size {args.batch_size}...")
+
     evals = []
-    model.eval()
-    
-    # Generation parameters
     generation_kwargs = {
-        "max_new_tokens": 150, 
+        "max_new_tokens": 150,
         "do_sample": False,
-        "temperature": 0.0,
         "pad_token_id": tokenizer.pad_token_id,
         "eos_token_id": tokenizer.eos_token_id
     }
 
     for batch in tqdm(eval_dataloader, desc="Evaluating Jokes"):
-        input_ids = batch["input_ids"].to(accelerator.device)
-        attention_mask = batch["attention_mask"].to(accelerator.device)
-        
+        input_ids = batch["input_ids"].to(device)
+        attention_mask = batch["attention_mask"].to(device)
+
         with torch.no_grad():
             outputs = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 **generation_kwargs
             )
-        
+
         generated_tokens = outputs[:, input_ids.shape[1]:]
         generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
-        
-        # Qwen models include the full prompt and a special start token in the output.
-        # We need to clean this to get the raw JSON response.
+
         cleaned_texts = [
             text.split(ASSISTANT_PREFIX)[-1].strip() if ASSISTANT_PREFIX in text else text.strip()
             for text in generated_texts
         ]
-        
+
         evals.extend(cleaned_texts)
 
     # 5. Process and Save Results
-    print("📝 Processing and saving results...")
-    
+    print("Processing and saving results...")
+
     eval_df = pd.DataFrame()
     eval_df["joke"] = jokes_combined
     eval_df["model_raw_output"] = evals
     eval_df["score"] = [get_rating(e) for e in evals]
 
-    # Save the final dataframe
     eval_df.to_csv(args.output_file, index=False)
-    print(f"✅ Evaluation complete! Results saved to {args.output_file}")
+    print(f"Evaluation complete! Results saved to {args.output_file}")
 
 
 if __name__ == "__main__":
