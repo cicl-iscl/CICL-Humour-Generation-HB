@@ -1,11 +1,9 @@
-import argparse
 import os
 import torch
-import weave
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import LoraConfig
 from dotenv import load_dotenv
 from grpo.rewards import (
     roberta_score,
@@ -18,13 +16,23 @@ from grpo.rewards import (
 )
 from grpo.cli import parse_args
 
+
 def main():
-    """Main function to set up and run GRPO training for joke generation on 72B."""
+    """
+    Main function to set up and run GRPO training for joke generation on 72B.
+
+    This script uses FSDP (via Accelerate) with LoRA for memory-efficient training.
+    NOTE: 4-bit quantization is NOT compatible with DeepSpeed ZeRO-3 or FSDP.
+    For 72B model on 4x H100 (320GB VRAM), we use:
+    - Full precision BF16 model sharded via FSDP
+    - LoRA adapters for parameter-efficient fine-tuning
+    - Gradient checkpointing for memory savings
+    """
     args = parse_args()
-    
+
     # Load environment variables
     load_dotenv()
-    
+
     # Load datasets
     print(f"Loading datasets from {args.train_data_file} and {args.test_data_file}...")
     try:
@@ -34,31 +42,23 @@ def main():
         print(f"Error loading datasets. Ensure the paths are correct. Error: {e}")
         return
 
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-    )
-
-    print(f"Loading {args.model_id} in 4-bit...")
+    print(f"Loading {args.model_id} in bf16 (FSDP will shard across GPUs)...")
+    # For FSDP: load model without device_map, let FSDP handle sharding
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
-        quantization_config=bnb_config,
-        device_map=None, # Accelerate/DeepSpeed will handle device placement
+        torch_dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
-        torch_dtype=torch.bfloat16, 
+        # Don't use device_map with FSDP - it handles placement
     )
-    
-    model.gradient_checkpointing_enable()
-    model = prepare_model_for_kbit_training(model)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
-    tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
+    # LoRA config for parameter-efficient fine-tuning
     peft_config = LoraConfig(
         r=64,
-        lora_alpha=32,
+        lora_alpha=128,  # Increased for better learning with larger r
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         lora_dropout=0.05,
         bias="none",
@@ -77,21 +77,29 @@ def main():
     reward_weights = [1.0, 2.0, 1.0, 0.5, 0.5, 1.0, 1.0]
 
     training_args = GRPOConfig(
-        output_dir=args.output_dir, 
+        output_dir=args.output_dir,
         report_to=args.report_to,
         num_train_epochs=args.num_train_epochs,
-        use_vllm=False, 
+        use_vllm=False,
         vllm_mode=None,
         max_completion_length=args.max_completion_length,
         temperature=0.5,
+        generation_batch_size=args.generation_batch_size,
+        num_generations=args.num_generations,
         reward_weights=reward_weights,
         learning_rate=args.learning_rate,
         logging_steps=10,
         eval_strategy="epoch",
         save_strategy="steps",
         save_steps=100,
-        gradient_checkpointing=True, # Ensure TRL knows we want this
+        per_device_train_batch_size=args.per_device_train_batch_size,
+        per_device_eval_batch_size=args.per_device_eval_batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        gradient_checkpointing=True,
         bf16=True,
+        push_to_hub=True,
+        hub_model_id=f"KonradBRG/Qwen2.5-72B-Jokester",
+        ddp_find_unused_parameters=False,
     )
 
     trainer = GRPOTrainer(
@@ -107,28 +115,36 @@ def main():
     print("Starting GRPO training...")
     trainer.train()
     print("Training complete.")
-    print("\n--- Example Joke Generation Post-Training ---")
-    
-    # Switch to eval mode
-    model.eval()
-    prompt = "Generate the funniest possible joke that contains these two words: 'microwave', 'shoes'. Return only the joke."
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda") # Explicitly send to CUDA
-    
-    with torch.no_grad():
-        for i in range(5):
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=100,
-                temperature=0.8,
-                do_sample=True,
-                pad_token_id=tokenizer.eos_token_id
-            )
-            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            if prompt in response:
-                response = response.split(prompt)[-1].strip()
-            print(f"Joke {i+1}: {response}")
-            print("-" * 24)
+
+    # Save the final model
+    trainer.save_model()
+    print(f"Model saved to {args.output_dir}")
+
+    # Only run generation demo on main process
+    if trainer.accelerator.is_main_process:
+        print("\n--- Example Joke Generation Post-Training ---")
+        model = trainer.model
+        model.eval()
+
+        prompt = "Generate the funniest possible joke that contains these two words: 'microwave', 'shoes'. Return only the joke."
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+        with torch.no_grad():
+            for i in range(5):
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=100,
+                    temperature=0.8,
+                    do_sample=True,
+                    pad_token_id=tokenizer.pad_token_id
+                )
+                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                if prompt in response:
+                    response = response.split(prompt)[-1].strip()
+                print(f"Joke {i+1}: {response}")
+                print("-" * 24)
+
 
 if __name__ == "__main__":
-    os.environ['VLLM_CONFIGURE_LOGGING'] = '0' 
+    os.environ['VLLM_CONFIGURE_LOGGING'] = '0'
     main()

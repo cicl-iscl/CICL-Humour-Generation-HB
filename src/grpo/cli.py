@@ -59,9 +59,10 @@ def parse_args():
     )
     
     # Batch/Generation settings
-    parser.add_argument("--per_device_train_batch_size", type=int, default=16, help="Batch size per device for training.")
-    parser.add_argument("--per_device_eval_batch_size", type=int, default=16, help="Batch size per device for evaluation.")
-    parser.add_argument("--generation_batch_size", type=int, default=16, help="Batch size for parallel generation.")
-    parser.add_argument("--num_generations", type=int, default=16, help="Number of responses to generate per prompt (G in GRPO).")
+    parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Batch size per device for training.")
+    parser.add_argument("--per_device_eval_batch_size", type=int, default=1, help="Batch size per device for evaluation.")
+    parser.add_argument("--generation_batch_size", type=int, default=4, help="Batch size for parallel generation.")
+    parser.add_argument("--num_generations", type=int, default=4, help="Number of responses to generate per prompt (G in GRPO).")
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=8, help="Gradient accumulation steps.")
 
     return parser.parse_args()

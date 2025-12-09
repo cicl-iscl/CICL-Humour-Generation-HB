@@ -17,7 +17,7 @@ def compute_metrics(eval_pred):
     """
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
-    rmse = root_mean_squared_error(labels, preds, squared=False) 
+    rmse = root_mean_squared_error(labels, preds)
     mae = mean_absolute_error(labels, preds)
     acc = accuracy_score(labels, preds)
     return {"rmse": rmse, "accuracy": acc, "mae": mae}
@@ -129,27 +129,35 @@ if __name__ == "__main__":
         print("FATAL ERROR: HierarchicalClassifier could not be imported. Ensure modeling_custom.py is correct.")
         exit(1)
 
-    # Setup Training Arguments
-    args = TrainingArguments(
+    # Setup Training Arguments - configured for multi-GPU via Accelerate
+    training_args = TrainingArguments(
         output_dir=OUTPUT_DIR,
         per_device_train_batch_size=TRAIN_BATCH_SIZE,
-        per_device_eval_batch_size=8,
+        per_device_eval_batch_size=16,
         num_train_epochs=NUM_TRAIN_EPOCHS,
         learning_rate=LEARNING_RATE,
         eval_strategy="epoch",
-        save_strategy="no",
+        save_strategy="epoch",
+        save_total_limit=3,
+        load_best_model_at_end=True,
+        metric_for_best_model="rmse",
+        greater_is_better=False,
         warmup_ratio=0.1,
         weight_decay=0.01,
         report_to="wandb",
         push_to_hub=True,
         hub_model_id=HUB_MODEL_ID,
         optim="adamw_torch",
+        bf16=True,  # Use bf16 for faster training on A100/H100
+        dataloader_num_workers=4,
+        ddp_find_unused_parameters=False,
+        logging_steps=50,
     )
 
     # Initialize and Run Trainer
     trainer = Trainer(
         model=model,
-        args=args,
+        args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         compute_metrics=compute_metrics,

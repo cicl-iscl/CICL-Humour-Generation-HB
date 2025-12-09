@@ -1,51 +1,66 @@
 #!/bin/bash
-#SBATCH --job-name=Qwen72B_GRPO
+#SBATCH --job-name=Qwen7B_GRPO
 #SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:2
-#SBATCH --time=4:00:00
+#SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:4
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# NOTE: --mem flags are omitted per bwUniCluster documentation.
+# NOTE: This script runs smaller Qwen models (7B-14B) on A100 cluster
+# For 72B model, use grpo_job_72b.sh on H100 cluster
 
-# 1. Load Modules (Ensure you load the exact versions available)
+# 1. Load Modules
 module load devel/cuda/12.8
 module load devel/python/3.13.3-llvm-19.1
 echo "CUDA Home: $CUDA_HOME"
 
+# 2. Environment Variables for Distributed Training
 export ACCELERATE_USE_NCCL=1
 export NCCL_ASYNC_INIT=0
-export NCCL_DEBUG=INFO
-### export CUDA_LAUNCH_BLOCKING=1
+export NCCL_DEBUG=WARN
+export HF_HOME=$WORK/cache/huggingface
+export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
+export TRANSFORMERS_CACHE=$WORK/cache/huggingface
+mkdir -p $HF_HOME $TORCH_EXTENSIONS_DIR
 
-# 2. Define your Project Root
+# 3. Define your Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
 
-# 3. Activate the UV Environment
+# 4. Activate the UV Environment
 source $PROJECT_ROOT/src/.venv/bin/activate
 
-# 4. Change to the Project Root (Ensures script runs from the correct location)
-cd $PROJECT_ROOT
-cd src
+# 5. Change to the Project Root
+cd $PROJECT_ROOT/src
 
-# 5. Execute the Training (using 4 processes for 4 GPUs)
-echo "Starting distributed training on $SLURM_JOB_NUM_NODES node(s) with 4 GPUs..."
+# Create logs directory if it doesn't exist
+mkdir -p logs
 
-accelerate launch \
-    --num_processes 2 \
-    --multi_gpu \
-    --mixed_precision bf16 \
+# 6. Execute the Training with Accelerate
+echo "Starting GRPO training on $SLURM_JOB_NUM_NODES node(s) with 4 A100 GPUs..."
+echo "Using Accelerate config: accelerate_config_a100.yaml"
+
+accelerate launch --config_file accelerate_config_a100.yaml \
     train_qwen_grpo.py \
-    --model_id "Qwen/Qwen2.5-72B-Instruct" \
-    --output_dir "./checkpoints/qwen72b_grpo_run_01" \
+    --model_id "Qwen/Qwen2.5-7B-Instruct" \
+    --output_dir "./checkpoints/qwen7b_grpo" \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
     --num_train_epochs 1 \
     --learning_rate 1e-6 \
     --per_device_train_batch_size 1 \
-    --generation_batch_size 1
+    --gradient_accumulation_steps 8 \
+    --generation_batch_size 4 \
+    --num_generations 4 \
+    --max_completion_length 128
+
+# Check exit status
+if [ $? -eq 0 ]; then
+    echo "Training job completed successfully."
+else
+    echo "Training job failed with exit code $?."
+fi

@@ -1,3 +1,4 @@
+import os
 import emoji
 import re
 from collections import deque
@@ -75,39 +76,55 @@ def structure_diversity_reward(completions, **kwargs):
     return scores
 
 scoring_pipe = None
+_scoring_pipe_device = None
+
+
+def _get_current_device():
+    """Get the current device for this process in distributed training."""
+    if torch.cuda.is_available():
+        # In distributed training, each process should use its assigned GPU
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        return local_rank
+    return -1
+
 
 def roberta_score(completions, **kwargs):
     """
-    Scores humor using RoBERTA, but only for valid outputs (cell 7).
+    Scores humor using RoBERTA, but only for valid outputs.
     Invalid outputs get 0.0 regardless of what the model thinks.
+
+    NOTE: In distributed training, this loads the model on each process's GPU.
     """
-    global scoring_pipe
-    if scoring_pipe is None:
-        # Load the pipeline on the first call
-        print("Loading RoBERTA Joke Rater Pipeline...")
+    global scoring_pipe, _scoring_pipe_device
+
+    current_device = _get_current_device()
+
+    # Load or reload pipeline if device changed (shouldn't happen, but safety check)
+    if scoring_pipe is None or _scoring_pipe_device != current_device:
+        print(f"Loading RoBERTA Joke Rater Pipeline on device {current_device}...")
         scoring_pipe = pipeline(
-            "text-classification", 
-            model="KonradBRG/RoBERTA-Joke-Rater", 
+            "text-classification",
+            model="KonradBRG/RoBERTA-Joke-Rater",
             trust_remote_code=True,
-            device=0 if torch.cuda.is_available() else -1
+            device=current_device
         )
+        _scoring_pipe_device = current_device
         print("RoBERTA Pipeline loaded.")
 
-    scores = []
     # Only score completions that are valid jokes to reduce computation
     valid_completions = [c for c in completions if is_valid_single_joke(c)]
     valid_indices = [i for i, c in enumerate(completions) if is_valid_single_joke(c)]
-    
+
     # Initialize all scores to 0.0 (for invalid jokes)
     final_scores = [0.0] * len(completions)
-    
+
     if valid_completions:
         # Get scores for valid jokes
         roberta_labels = scoring_pipe(valid_completions)
         for idx, roberta_label in zip(valid_indices, roberta_labels):
-            roberta_score = float(roberta_label["label"])
-            final_scores[idx] = roberta_score
-            
+            score = float(roberta_label["label"])
+            final_scores[idx] = score
+
     return final_scores
 
 

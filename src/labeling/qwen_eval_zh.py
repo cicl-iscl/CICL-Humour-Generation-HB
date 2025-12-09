@@ -49,34 +49,34 @@ def main():
 
     # 2. Setup Model, Tokenizer, and Accelerator
     print(f"🤖 Initializing model: {args.model_name}...")
-    
-    accelerator = Accelerator()
-    
+
+    accelerator = Accelerator(mixed_precision="bf16")
+
     # Initialize dataset and get the tokenizer used within it
     eval_dataset = ListDataset(eval_prompts, args.model_name)
     tokenizer = eval_dataset.tokenizer
 
     # 3. Prepare DataLoader
-    # Use a lambda to pass the tokenizer to the collate function
     data_loader_collate_fn = lambda batch: collate_fn(batch, tokenizer)
-    
+
     eval_dataloader = DataLoader(
-        eval_dataset, 
-        batch_size=args.batch_size, 
-        shuffle=False, 
-        collate_fn=data_loader_collate_fn
+        eval_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        collate_fn=data_loader_collate_fn,
+        num_workers=4,
+        pin_memory=True,
     )
 
-    # Initialize model
+    # Initialize model - let Accelerate handle device placement
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
-        torch_dtype=torch.bfloat16 if accelerator.is_available() else torch.float32,
-        device_map={"": accelerator.device},
-        # Qwen models often use this config for better loading/generation
-        trust_remote_code=True 
+        torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
+        trust_remote_code=True
     )
 
-    # Prepare for acceleration
+    # Prepare for acceleration - this handles device placement
     model, eval_dataloader = accelerator.prepare(model, eval_dataloader)
 
     # 4. Inference Loop
