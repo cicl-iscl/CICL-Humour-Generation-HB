@@ -1,10 +1,8 @@
-import argparse
 import os
 import pandas as pd
 from tqdm import tqdm
 
 import kagglehub
-from huggingface_hub import login, HfFolder
 from datasets import load_dataset
 import torch
 
@@ -59,10 +57,13 @@ def load_and_combine_jokes():
 def main():
     """Main function to run the joke evaluation."""
     args = parse_args()
-    
-    if not HfFolder.get_token():
-        print("🔑 Hugging Face login required. Please log in interactively or set the HUGGING_FACE_HUB_TOKEN environment variable.")
-        login()
+
+    # Check for HF token - must be set via environment variable for batch jobs
+    hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if not hf_token:
+        print("ERROR: HF_TOKEN environment variable not set.")
+        print("Please set it in your job script: export HF_TOKEN=your_token_here")
+        return
 
     # 1. Load Data
     jokes_combined = load_and_combine_jokes()

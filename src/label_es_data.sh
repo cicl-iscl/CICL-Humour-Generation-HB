@@ -20,8 +20,13 @@ echo "CUDA Home: $CUDA_HOME"
 
 # 2. Environment Variables
 export HF_HOME=$WORK/cache/huggingface
-export TRANSFORMERS_CACHE=$WORK/cache/huggingface
 mkdir -p $HF_HOME
+
+# IMPORTANT: Set your HuggingFace token here (required for gated models like Llama)
+# Option 1: Hardcode it (not recommended for shared code)
+# export HF_TOKEN="hf_your_token_here"
+# Option 2: Read from a file (recommended)
+export HF_TOKEN=$(cat ~/.huggingface/token 2>/dev/null || echo "")
 
 # 3. Project Setup
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB

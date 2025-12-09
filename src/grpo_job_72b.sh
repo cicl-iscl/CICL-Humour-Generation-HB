@@ -26,8 +26,10 @@ export NCCL_DEBUG=WARN
 export NCCL_P2P_LEVEL=NVL  # Enable NVLink for H100
 export HF_HOME=$WORK/cache/huggingface
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
-export TRANSFORMERS_CACHE=$WORK/cache/huggingface
 mkdir -p $HF_HOME $TORCH_EXTENSIONS_DIR
+
+# HuggingFace token (required for model download and push_to_hub)
+export HF_TOKEN=$(cat ~/.huggingface/token 2>/dev/null || echo "")
 
 # Memory optimization for large models
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True

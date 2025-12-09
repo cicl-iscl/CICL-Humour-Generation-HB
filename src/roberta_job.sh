@@ -26,6 +26,9 @@ export HF_HOME=$WORK/cache/huggingface
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
 mkdir -p $HF_HOME $TORCH_EXTENSIONS_DIR
 
+# HuggingFace token (required for push_to_hub)
+export HF_TOKEN=$(cat ~/.huggingface/token 2>/dev/null || echo "")
+
 # 3. Project Setup
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
 source $PROJECT_ROOT/src/.venv/bin/activate
