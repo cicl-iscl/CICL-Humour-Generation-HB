@@ -36,7 +36,7 @@ def main():
     print("📥 Loading jokes from zh_jokes.csv...")
     try:
         # NOTE: Ensure zh_jokes.csv is in the current working directory or provide the full path
-        zh_joke_df = pd.read_csv("zh_jokes.csv")
+        zh_joke_df = pd.read_csv("../data/zh_jokes.csv")
     except FileNotFoundError:
         print("Error: zh_jokes.csv not found. Please ensure it's in the correct directory.")
         return
