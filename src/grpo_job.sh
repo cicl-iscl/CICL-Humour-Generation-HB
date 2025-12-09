@@ -25,7 +25,9 @@ export NCCL_ASYNC_INIT=0
 export NCCL_DEBUG=WARN
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
 mkdir -p $TORCH_EXTENSIONS_DIR
-# Don't override HF_HOME so the library finds the token in ~/.cache/huggingface/token
+
+# Wandb API key (run `wandb login` once on the cluster to set this up)
+export WANDB_API_KEY=$(cat ~/.netrc 2>/dev/null | grep -A2 "api.wandb.ai" | grep password | awk '{print $2}' || echo "")
 
 # 3. Define your Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
