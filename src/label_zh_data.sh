@@ -19,11 +19,7 @@ module load devel/python/3.13.3-llvm-19.1
 echo "CUDA Home: $CUDA_HOME"
 
 # 2. Environment Variables
-export HF_HOME=$WORK/cache/huggingface
-mkdir -p $HF_HOME
-
-# HuggingFace token (read from file if exists)
-export HF_TOKEN=$(cat ~/.huggingface/token 2>/dev/null || echo "")
+# Don't override HF_HOME so the library finds the token in ~/.cache/huggingface/token
 
 # 3. Project Setup
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB

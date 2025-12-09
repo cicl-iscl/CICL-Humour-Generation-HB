@@ -58,12 +58,8 @@ def main():
     """Main function to run the joke evaluation."""
     args = parse_args()
 
-    # Check for HF token - must be set via environment variable for batch jobs
-    hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if not hf_token:
-        print("ERROR: HF_TOKEN environment variable not set.")
-        print("Please set it in your job script: export HF_TOKEN=your_token_here")
-        return
+    # huggingface_hub will automatically use token from HF_HOME/stored_tokens
+    # No need for manual login in batch jobs
 
     # 1. Load Data
     jokes_combined = load_and_combine_jokes()

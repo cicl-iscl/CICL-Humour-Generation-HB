@@ -23,12 +23,9 @@ echo "CUDA Home: $CUDA_HOME"
 export ACCELERATE_USE_NCCL=1
 export NCCL_ASYNC_INIT=0
 export NCCL_DEBUG=WARN
-export HF_HOME=$WORK/cache/huggingface
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
-mkdir -p $HF_HOME $TORCH_EXTENSIONS_DIR
-
-# HuggingFace token (required for model download and push_to_hub)
-export HF_TOKEN=$(cat ~/.huggingface/token 2>/dev/null || echo "")
+mkdir -p $TORCH_EXTENSIONS_DIR
+# Don't override HF_HOME so the library finds the token in ~/.cache/huggingface/token
 
 # 3. Define your Project Root
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
