@@ -87,6 +87,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"  # Required for batched generation with decoder-only models
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
