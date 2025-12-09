@@ -25,9 +25,6 @@ export NCCL_DEBUG=WARN
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
 mkdir -p $TORCH_EXTENSIONS_DIR
 
-# Wandb API key (run `wandb login` once on the cluster to set this up)
-export WANDB_API_KEY=$(cat ~/.netrc 2>/dev/null | grep -A2 "api.wandb.ai" | grep password | awk '{print $2}' || echo "")
-
 # 3. Project Setup
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/CICL-Humour-Generation-HB
 source $PROJECT_ROOT/src/.venv/bin/activate
