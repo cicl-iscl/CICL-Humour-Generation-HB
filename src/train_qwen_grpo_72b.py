@@ -64,6 +64,7 @@ def main():
         task_type="CAUSAL_LM",
     )
 
+    # Weights from notebook: [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     reward_fns = [
         roberta_score,
         structure_diversity_reward,
@@ -73,7 +74,7 @@ def main():
         headline_adherence,
         coherence_penalty
     ]
-    reward_weights = [1.0, 2.0, 1.0, 0.5, 0.5, 1.0, 1.0]
+    reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
 
     training_args = GRPOConfig(
         output_dir=args.output_dir,
@@ -82,7 +83,7 @@ def main():
         use_vllm=False,
         vllm_mode=None,
         max_completion_length=args.max_completion_length,
-        temperature=0.5,
+        temperature=0.7,  # Higher temperature for more exploration
         generation_batch_size=args.generation_batch_size,
         num_generations=args.num_generations,
         reward_weights=reward_weights,

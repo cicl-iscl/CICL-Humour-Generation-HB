@@ -52,12 +52,12 @@ accelerate launch --config_file accelerate_config_a100.yaml \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
     --num_train_epochs 1 \
-    --learning_rate 1e-6 \
+    --learning_rate 5e-6 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --generation_batch_size 4 \
     --num_generations 4 \
-    --max_completion_length 128
+    --max_completion_length 64
 
 # Check exit status
 if [ $? -eq 0 ]; then

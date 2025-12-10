@@ -53,7 +53,7 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Define Reward Function List and Weights (matching cell 10)
+    # Define Reward Function List and Weights (matching notebook grpo_poc.ipynb)
     reward_fns = [
         roberta_score,
         structure_diversity_reward,
@@ -63,7 +63,8 @@ def main():
         headline_adherence,
         coherence_penalty
     ]
-    reward_weights = [1.0, 2.0, 1.0, 0.5, 0.5, 1.0, 1.0]
+    # Weights from notebook: [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
+    reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     model_name = args.model_id.split("/")[-1] + "-Jokester"
     # Configure GRPO Training
     training_args = GRPOConfig(
@@ -73,7 +74,7 @@ def main():
         use_vllm=False,
         vllm_mode=None,
         max_completion_length=args.max_completion_length,
-        temperature=0.5,
+        temperature=0.7,  # Higher temperature for more exploration (matching notebook)
         generation_batch_size=args.generation_batch_size,
         num_generations=args.num_generations,
         reward_weights=reward_weights,
@@ -85,7 +86,7 @@ def main():
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
-        gradient_checkpointing=True,
+        gradient_checkpointing=False,  # Disable for better gradient flow in RL
         bf16=True,
         push_to_hub=True,
         hub_model_id=f"KonradBRG/{model_name}",
