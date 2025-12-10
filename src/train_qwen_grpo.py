@@ -36,7 +36,18 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
         torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
     )
+
+    # Ensure model is in training mode with gradients enabled
+    model.train()
+    for param in model.parameters():
+        param.requires_grad = True
+
+    # Debug: print trainable params
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Trainable params: {trainable_params:,} / {total_params:,} ({100*trainable_params/total_params:.2f}%)")
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
     if tokenizer.pad_token is None:

@@ -60,20 +60,21 @@ class HierarchicalClassifier(XLMRobertaPreTrainedModel):
         x = self.relu(self.proj2(x))
         lb = self.binary_head(x)  # Logits for binary (0 vs 1-10)
         lc = self.child_head(x)  # Logits for child (1-10)
-        pb = torch.softmax(lb, dim=-1)
-        pc = torch.softmax(lc, dim=-1)
 
-        sc = pc * pb[:, 1].unsqueeze(-1)
-        logits = torch.cat([pb[:, 0].unsqueeze(-1), sc], dim=-1)
+        # Compute combined logits for inference (11 classes: 0-10)
+        # Use log-space for numerical stability
+        log_pb = torch.log_softmax(lb, dim=-1)
+        log_pc = torch.log_softmax(lc, dim=-1)
+
+        # P(class=0) = P(binary=0)
+        # P(class=k) = P(binary=1) * P(child=k) for k in 1-10
+        # In log space: log P(class=k) = log P(binary=1) + log P(child=k)
+        log_probs_nonzero = log_pb[:, 1].unsqueeze(-1) + log_pc  # [batch, 10]
+        logits = torch.cat([log_pb[:, 0].unsqueeze(-1), log_probs_nonzero], dim=-1)  # [batch, 11]
 
         loss = None
         if labels is not None:
-            # Compute regression loss
-            probs = torch.softmax(logits, dim=-1)
-            expected = (probs * torch.arange(0, logits.size(1), device=logits.device, dtype=torch.float)).sum(dim=-1)
-            reg_loss = torch.mean((expected - labels.float()) ** 2)
-
-            # Binary classification loss
+            # Binary classification loss (main gradient signal)
             bt = (labels != 0).long()
             loss_bin = nn.CrossEntropyLoss(weight=self.class_weights_binary)(lb, bt)
 
@@ -83,9 +84,14 @@ class HierarchicalClassifier(XLMRobertaPreTrainedModel):
                 cl = labels[nz] - 1
                 loss_child = nn.CrossEntropyLoss(weight=self.class_weights_child)(lc[nz], cl)
             else:
-                loss_child = torch.tensor(0.0, device=logits.device)
+                loss_child = torch.tensor(0.0, device=logits.device, requires_grad=True)
 
-            clf_loss = loss_bin + loss_child
-            loss = self.a * reg_loss + self.b * clf_loss
+            # Regression loss for fine-grained ordering
+            probs = torch.softmax(logits, dim=-1)
+            expected = (probs * torch.arange(0, logits.size(1), device=logits.device, dtype=torch.float)).sum(dim=-1)
+            reg_loss = torch.mean((expected - labels.float()) ** 2)
+
+            # Fixed weights instead of learnable (more stable)
+            loss = loss_bin + loss_child + 0.1 * reg_loss
 
         return {"loss": loss, "logits": logits}
