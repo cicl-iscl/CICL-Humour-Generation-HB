@@ -9,7 +9,7 @@ def build_joke_dataset():
     """
     Loads English, Chinese, and Spanish joke data, processes it, and returns a single DataFrame.
     """
-    eval_df = pd.read_csv("../data/labeled_jokes_full.csv")
+    eval_df = pd.read_csv("../data/combined_jokes_full.csv")
     eval_df_zh = pd.read_csv("../data/zh_data_labeled_qwen7b.csv")
     eval_df_es = pd.read_csv("../data/es_data_labeled_llama3.1.csv")
     eval_df_zh["labels"] = eval_df_zh.score.astype(int)
