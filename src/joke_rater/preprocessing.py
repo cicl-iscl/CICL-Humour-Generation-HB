@@ -7,15 +7,19 @@ from dotenv import load_dotenv
 
 def build_joke_dataset():
     """
-    Loads English and Chinese joke data, processes it, and returns a single DataFrame.
+    Loads English, Chinese, and Spanish joke data, processes it, and returns a single DataFrame.
     """
     eval_df = pd.read_csv("../data/labeled_jokes_full.csv")
     eval_df_zh = pd.read_csv("../data/zh_data_labeled_qwen7b.csv")
+    eval_df_es = pd.read_csv("../data/es_data_labeled_llama3.1.csv")
     eval_df_zh["labels"] = eval_df_zh.score.astype(int)
+    eval_df_es["labels"] = eval_df_es.score.astype(int)
     eval_df_zh = eval_df_zh[["joke", "labels"]].dropna()
+    eval_df_es = eval_df_es[["joke", "labels"]].dropna()
+    
     eval_df = eval_df[["joke", "labels"]].dropna()
 
-    return pd.concat([eval_df, eval_df_zh], ignore_index=True)
+    return pd.concat([eval_df, eval_df_zh, eval_df_es], ignore_index=True)
 
 
 def get_train_test_split(eval_df, test_size=0.2, random_state=42):
