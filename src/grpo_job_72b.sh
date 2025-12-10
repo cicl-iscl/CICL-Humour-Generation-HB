@@ -27,9 +27,6 @@ export NCCL_P2P_LEVEL=NVL  # Enable NVLink for H100
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
 mkdir -p $TORCH_EXTENSIONS_DIR
 
-# Wandb API key (run `wandb login` once on the cluster to set this up)
-export WANDB_API_KEY=$(cat ~/.netrc 2>/dev/null | grep -A2 "api.wandb.ai" | grep password | awk '{print $2}' || echo "")
-
 # Memory optimization for large models
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
