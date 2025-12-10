@@ -39,9 +39,9 @@ accelerate launch --config_file accelerate_config_a100.yaml \
     --model_name "xlm-roberta-large" \
     --output_dir "./results/joke_rater" \
     --hub_model_id "KonradBRG/joke-rater-xlm-roberta" \
-    --num_train_epochs 10 \
+    --num_train_epochs 5 \
     --learning_rate 5e-5 \
-    --per_device_train_batch_size 128
+    --per_device_train_batch_size 32
 
 # Check exit status
 if [ $? -eq 0 ]; then
