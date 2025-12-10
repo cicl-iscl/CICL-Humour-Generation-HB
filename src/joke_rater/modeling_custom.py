@@ -33,9 +33,6 @@ class HierarchicalClassifier(XLMRobertaPreTrainedModel):
         self.binary_head = nn.Linear(h // 2, 2)
         self.child_head = nn.Linear(h // 2, num_child_labels)
 
-        self.a = nn.Parameter(torch.tensor([0.5], dtype=torch.float))
-        self.b = nn.Parameter(torch.tensor([0.5], dtype=torch.float))
-
         # Register class weights as buffers so they move with the model to GPU
         if class_weights_binary is not None:
             if not isinstance(class_weights_binary, torch.Tensor):
@@ -84,7 +81,8 @@ class HierarchicalClassifier(XLMRobertaPreTrainedModel):
                 cl = labels[nz] - 1
                 loss_child = nn.CrossEntropyLoss(weight=self.class_weights_child)(lc[nz], cl)
             else:
-                loss_child = torch.tensor(0.0, device=logits.device, requires_grad=True)
+                # Use a zero that's connected to the computation graph
+                loss_child = lc.sum() * 0.0
 
             # Regression loss for fine-grained ordering
             probs = torch.softmax(logits, dim=-1)

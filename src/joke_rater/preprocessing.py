@@ -62,10 +62,14 @@ def load_datasets(model_name):
     test_ds = test_ds.map(tokenize, batched=True)
     val_ds = val_ds.map(tokenize, batched=True)
 
-    # Remove temporary columns used by pandas/map
-    train_ds = train_ds.remove_columns(['__index_level_0__'])
-    test_ds = test_ds.remove_columns(['__index_level_0__'])
-    val_ds = val_ds.remove_columns(['__index_level_0__'])
+    # Remove temporary columns used by pandas/map (if they exist)
+    for col in ['__index_level_0__']:
+        if col in train_ds.column_names:
+            train_ds = train_ds.remove_columns([col])
+        if col in test_ds.column_names:
+            test_ds = test_ds.remove_columns([col])
+        if col in val_ds.column_names:
+            val_ds = val_ds.remove_columns([col])
 
 
     datasets = DatasetDict({
