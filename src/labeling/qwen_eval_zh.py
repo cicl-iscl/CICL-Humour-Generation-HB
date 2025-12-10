@@ -26,6 +26,7 @@ ASSISTANT_PREFIX = "<|im_start|>assistant\n"
 
 class JokeDataset(Dataset):
     """Simple dataset for joke evaluation."""
+
     def __init__(self, prompts, tokenizer):
         self.prompts = prompts
         self.tokenizer = tokenizer
@@ -35,7 +36,9 @@ class JokeDataset(Dataset):
 
     def __getitem__(self, i):
         messages = [{"role": "user", "content": self.prompts[i]}]
-        return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        return self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
 
 
 def collate_fn(batch, tokenizer):
@@ -43,6 +46,7 @@ def collate_fn(batch, tokenizer):
 
 
 # --- 2. MAIN EXECUTION ---
+
 
 def main():
     """Main function to run the joke evaluation."""
@@ -68,13 +72,15 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"  # Required for batched generation with decoder-only models
+    tokenizer.padding_side = (
+        "left"  # Required for batched generation with decoder-only models
+    )
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         torch_dtype=torch.bfloat16,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
     )
     model.eval()
 
@@ -95,7 +101,7 @@ def main():
         "max_new_tokens": 150,
         "do_sample": False,
         "pad_token_id": tokenizer.pad_token_id,
-        "eos_token_id": tokenizer.eos_token_id
+        "eos_token_id": tokenizer.eos_token_id,
     }
 
     for batch in tqdm(eval_dataloader, desc="Evaluating Jokes"):
@@ -104,16 +110,20 @@ def main():
 
         with torch.no_grad():
             outputs = model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                **generation_kwargs
+                input_ids=input_ids, attention_mask=attention_mask, **generation_kwargs
             )
 
-        generated_tokens = outputs[:, input_ids.shape[1]:]
-        generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=False)
+        generated_tokens = outputs[:, input_ids.shape[1] :]
+        generated_texts = tokenizer.batch_decode(
+            generated_tokens, skip_special_tokens=False
+        )
 
         cleaned_texts = [
-            text.split(ASSISTANT_PREFIX)[-1].strip() if ASSISTANT_PREFIX in text else text.strip()
+            (
+                text.split(ASSISTANT_PREFIX)[-1].strip()
+                if ASSISTANT_PREFIX in text
+                else text.strip()
+            )
             for text in generated_texts
         ]
 

@@ -11,7 +11,7 @@ from grpo.rewards import (
     formatting,
     length_penalty,
     headline_adherence,
-    coherence_penalty
+    coherence_penalty,
 )
 from grpo.cli import parse_args
 
@@ -26,17 +26,19 @@ def main():
     # Load datasets
     print(f"Loading datasets from {args.train_data_file} and {args.test_data_file}...")
     try:
-        train_dataset = load_dataset("parquet", data_files=args.train_data_file, split="train")
-        test_dataset = load_dataset("parquet", data_files=args.test_data_file, split="train")
+        train_dataset = load_dataset(
+            "parquet", data_files=args.train_data_file, split="train"
+        )
+        test_dataset = load_dataset(
+            "parquet", data_files=args.test_data_file, split="train"
+        )
     except Exception as e:
         print(f"Error loading datasets. Ensure the paths are correct. Error: {e}")
         return
 
     # For FSDP/DDP: don't set device_map, let Accelerate handle placement
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_id,
-        torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
+        args.model_id, torch_dtype=torch.bfloat16
     )
 
     # Ensure model is in training mode with gradients enabled
@@ -47,7 +49,9 @@ def main():
     # Debug: print trainable params
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in model.parameters())
-    print(f"Trainable params: {trainable_params:,} / {total_params:,} ({100*trainable_params/total_params:.2f}%)")
+    print(
+        f"Trainable params: {trainable_params:,} / {total_params:,} ({100*trainable_params/total_params:.2f}%)"
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
     if tokenizer.pad_token is None:
@@ -61,7 +65,7 @@ def main():
         formatting,
         length_penalty,
         headline_adherence,
-        coherence_penalty
+        coherence_penalty,
     ]
     # Weights from notebook: [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
@@ -100,9 +104,9 @@ def main():
         reward_funcs=reward_fns,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=test_dataset
+        eval_dataset=test_dataset,
     )
-    
+
     print("Starting GRPO training...")
     trainer.train()
     print("Training complete.")
@@ -129,11 +133,11 @@ def main():
                     pad_token_id=tokenizer.pad_token_id,
                 )
                 response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                response = response[len(prompt):].strip()
+                response = response[len(prompt) :].strip()
                 print(f"Joke {i+1}: {response}")
                 print("-" * 24)
 
 
 if __name__ == "__main__":
-    os.environ['VLLM_CONFIGURE_LOGGING'] = '0'
+    os.environ["VLLM_CONFIGURE_LOGGING"] = "0"
     main()

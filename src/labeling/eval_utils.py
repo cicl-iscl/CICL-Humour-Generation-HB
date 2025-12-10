@@ -3,39 +3,46 @@ import re
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 
+
 def parse_args():
     """Parses command line arguments common to evaluation scripts."""
-    parser = argparse.ArgumentParser(description="Evaluate jokes using a Hugging Face model optimized with Accelerate.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate jokes using a Hugging Face model optimized with Accelerate."
+    )
     parser.add_argument(
         "--model_name",
         type=str,
         default="Orion-zhen/Qwen2.5-7B-Instruct-Uncensored",
-        help="The Hugging Face model identifier to use for evaluation."
+        help="The Hugging Face model identifier to use for evaluation.",
     )
     parser.add_argument(
         "--batch_size",
         type=int,
         default=8,
-        help="Batch size for accelerated inference."
+        help="Batch size for accelerated inference.",
     )
     parser.add_argument(
         "--output_file",
         type=str,
         default="zh_data_labeled.csv",
-        help="Path to save the output CSV file with scores."
+        help="Path to save the output CSV file with scores.",
     )
     return parser.parse_args()
+
 
 class ListDataset(Dataset):
     """
     Custom PyTorch Dataset for holding pre-formatted text prompts.
     It applies the chat template but does not tokenize here.
     """
+
     def __init__(self, original_list, model_name, assistant_prefix=None):
         self.original_list = original_list
         self.assistant_prefix = assistant_prefix
         # The tokenizer must be loaded with the specific model's name
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True
+        )
         # Ensure the tokenizer has a pad token for batching
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -50,10 +57,9 @@ class ListDataset(Dataset):
         # apply_chat_template returns the formatted string
         # add_generation_prompt=True adds the assistant prefix automatically
         return self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True
         )
+
 
 def get_rating(evaluation_text):
     """
@@ -66,17 +72,15 @@ def get_rating(evaluation_text):
         rating = int(match.group(1))
         # Ensure the rating is within the valid range [0, 10]
         return min(10.0, max(0.0, float(rating)))
-    
+
     # Fallback if no valid rating is found
     return 0.0
+
 
 def collate_fn(batch, tokenizer):
     """Custom collate function for padding the batched text prompts."""
     # Tokenize the batch of text strings
     tokenized_batch = tokenizer(
-        batch, 
-        padding=True, 
-        truncation=True, 
-        return_tensors="pt"
+        batch, padding=True, truncation=True, return_tensors="pt"
     )
     return tokenized_batch

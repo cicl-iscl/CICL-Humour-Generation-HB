@@ -15,10 +15,12 @@ if __name__ == "__main__":
     print(f"Loaded {len(oneliner_jokes)} one-liner jokes.")
     oneliner_df = pd.DataFrame(columns=["joke", "labels"])
     oneliner_df["joke"] = oneliner_jokes
-    oneliner_df["labels"] = 10 # Assign highest humor score to one-liners
+    oneliner_df["labels"] = 10  # Assign highest humor score to one-liners
 
     # Combine datasets
-    combined_df = pd.concat([labeled_df[["joke", "labels"]].dropna(), oneliner_df], ignore_index=True)
+    combined_df = pd.concat(
+        [labeled_df[["joke", "labels"]].dropna(), oneliner_df], ignore_index=True
+    )
     print(f"Combined dataset has {len(combined_df)} jokes.")
 
     # Save combined dataset

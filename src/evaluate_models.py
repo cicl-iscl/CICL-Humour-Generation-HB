@@ -32,7 +32,9 @@ from grpo.rewards import (
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate and compare joke generation models")
+    parser = argparse.ArgumentParser(
+        description="Evaluate and compare joke generation models"
+    )
     parser.add_argument(
         "--models",
         type=str,
@@ -106,7 +108,9 @@ def load_model_and_tokenizer(model_path: str, device: str = "cuda"):
         base_model_name = adapter_config.get("base_model_name_or_path")
         print(f"  -> LoRA adapter, base model: {base_model_name}")
 
-        tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            base_model_name, trust_remote_code=True
+        )
         base_model = AutoModelForCausalLM.from_pretrained(
             base_model_name,
             torch_dtype=torch.bfloat16,
@@ -152,10 +156,14 @@ def generate_jokes(
         batch_texts = []
         for prompt in batch_prompts:
             messages = [{"role": "user", "content": prompt}]
-            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
             batch_texts.append(text)
 
-        inputs = tokenizer(batch_texts, padding=True, truncation=True, return_tensors="pt").to(device)
+        inputs = tokenizer(
+            batch_texts, padding=True, truncation=True, return_tensors="pt"
+        ).to(device)
 
         batch_generations = [[] for _ in range(len(batch_prompts))]
 
@@ -172,7 +180,9 @@ def generate_jokes(
 
             # Decode only the generated tokens
             generated_tokens = outputs[:, inputs["input_ids"].shape[1] :]
-            generated_texts = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+            generated_texts = tokenizer.batch_decode(
+                generated_tokens, skip_special_tokens=True
+            )
 
             for j, text in enumerate(generated_texts):
                 batch_generations[j].append(text.strip())
@@ -227,7 +237,9 @@ def evaluate_model(
 
     # Flatten for metrics that need all jokes
     all_jokes = [joke for gens in all_generations for joke in gens]
-    all_prompts_expanded = [p for p, gens in zip(prompts, all_generations) for _ in gens]
+    all_prompts_expanded = [
+        p for p, gens in zip(prompts, all_generations) for _ in gens
+    ]
 
     # Compute metrics
     print("  Computing RoBERTa scores...")
@@ -330,7 +342,9 @@ def main():
     # Set model names
     model_names = args.model_names if args.model_names else args.models
     if len(model_names) != len(args.models):
-        print("Warning: model_names length doesn't match models, using model paths as names")
+        print(
+            "Warning: model_names length doesn't match models, using model paths as names"
+        )
         model_names = args.models
 
     # Evaluate each model

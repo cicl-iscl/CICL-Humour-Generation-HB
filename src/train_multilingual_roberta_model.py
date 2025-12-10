@@ -4,7 +4,10 @@ import torch
 from dotenv import load_dotenv
 from sklearn.metrics import root_mean_squared_error, accuracy_score, mean_absolute_error
 from transformers import (
-    AutoModelForSequenceClassification, AutoConfig, Trainer, TrainingArguments
+    AutoModelForSequenceClassification,
+    AutoConfig,
+    Trainer,
+    TrainingArguments,
 )
 from joke_rater.cli import parse_args
 from joke_rater.preprocessing import load_datasets
@@ -29,24 +32,29 @@ def get_cross_entropy_weights(train_ds):
     class imbalance using the formula: weight_i = total_count / (num_classes * count_i).
     """
     labels = np.array(train_ds["labels"])
-    
+
     # 1. Binary Weights (0 vs. 1-10)
     binary_counts = np.array([(labels == 0).sum(), (labels != 0).sum()], dtype=float)
-    binary_weights = (binary_counts.sum() / (2 * binary_counts))
+    binary_weights = binary_counts.sum() / (2 * binary_counts)
     binary_weights = torch.tensor(binary_weights, dtype=torch.float)
 
     # 2. Child Weights (1 to 10, only for non-zero labels)
-    child_labels = labels[labels != 0]    
-    num_child_classes = 10 # Labels 1 through 10
-    child_counts = np.array([(child_labels == c).sum() for c in range(1, num_child_classes + 1)], dtype=float)
+    child_labels = labels[labels != 0]
+    num_child_classes = 10  # Labels 1 through 10
+    child_counts = np.array(
+        [(child_labels == c).sum() for c in range(1, num_child_classes + 1)],
+        dtype=float,
+    )
 
-    child_weights = (child_counts.sum() / (num_child_classes * child_counts))
+    child_weights = child_counts.sum() / (num_child_classes * child_counts)
     child_weights = torch.tensor(child_weights, dtype=torch.float)
 
     return binary_weights, child_weights
 
 
-def setup_custom_config_and_save(model, tokenizer, train_df, binary_weights, child_weights, output_dir):
+def setup_custom_config_and_save(
+    model, tokenizer, train_df, binary_weights, child_weights, output_dir
+):
     """
     Registers and updates the model's configuration for saving/sharing with
     custom attributes and auto_map for the custom model class.
@@ -54,28 +62,30 @@ def setup_custom_config_and_save(model, tokenizer, train_df, binary_weights, chi
 
     HierarchicalClassifier.config_class = HierarchicalConfig
     AutoConfig.register("xlm-roberta-joke-rater", HierarchicalConfig)
-    AutoModelForSequenceClassification.register(HierarchicalConfig, HierarchicalClassifier)
+    AutoModelForSequenceClassification.register(
+        HierarchicalConfig, HierarchicalClassifier
+    )
 
     current_config_dict = model.config.to_dict()
     # Instantiate the custom config using the base model's config
     model.config = HierarchicalConfig(**current_config_dict)
 
-    n_labels = len(train_df.labels.unique()) # Should be 11 (0-10)
-    model.config.num_child_labels = n_labels - 1 # 10
+    n_labels = len(train_df.labels.unique())  # Should be 11 (0-10)
+    model.config.num_child_labels = n_labels - 1  # 10
     model.config.class_weights_binary = binary_weights.tolist()
     model.config.class_weights_child = child_weights.tolist()
 
-    unique_labels = sorted(train_df["labels"].unique()) # [0, 1, ..., 10]
+    unique_labels = sorted(train_df["labels"].unique())  # [0, 1, ..., 10]
     id2label = {int(i): int(label) for i, label in enumerate(unique_labels)}
     label2id = {v: k for k, v in id2label.items()}
     model.config.id2label = id2label
     model.config.label2id = label2id
-    model.config.num_labels = n_labels # Should be 11
+    model.config.num_labels = n_labels  # Should be 11
 
     # Add auto_map for custom class serialization
     model.config.auto_map = {
         "AutoConfig": "modeling_custom.HierarchicalConfig",
-        "AutoModelForSequenceClassification": "modeling_custom.HierarchicalClassifier"
+        "AutoModelForSequenceClassification": "modeling_custom.HierarchicalClassifier",
     }
 
     os.makedirs(output_dir, exist_ok=True)
@@ -86,14 +96,12 @@ def setup_custom_config_and_save(model, tokenizer, train_df, binary_weights, chi
     print(f"Generated id2label: {id2label}")
 
 
-
-
 if __name__ == "__main__":
-    
+
     args = parse_args()
-    
+
     load_dotenv()
-    
+
     # Use parsed arguments
     MODEL_NAME = args.model_name
     OUTPUT_DIR = args.output_dir
@@ -101,32 +109,35 @@ if __name__ == "__main__":
     NUM_TRAIN_EPOCHS = args.num_train_epochs
     LEARNING_RATE = args.learning_rate
     TRAIN_BATCH_SIZE = args.per_device_train_batch_size
-    
+
     print(f"--- Starting Training ---")
     print(f"Model: {MODEL_NAME}")
     print(f"Output Directory: {OUTPUT_DIR}")
-    
+
     # Data Loading and Preprocessing
     datasets, tokenizer, train_df = load_datasets(MODEL_NAME)
     train_ds = datasets["train"]
     val_ds = datasets["validation"]
     test_ds = datasets["test"]
-    
+
     # Calculate Class Weights
     binary_weights, child_weights = get_cross_entropy_weights(train_ds)
     n_labels = len(train_df.labels.unique())
-   
+
     # Initialize Custom Model
     try:
         from joke_rater.modeling_custom import HierarchicalClassifier
+
         model = HierarchicalClassifier.from_pretrained(
             MODEL_NAME,
-            num_child_labels=n_labels - 1, # 10 classes (1 to 10)
+            num_child_labels=n_labels - 1,  # 10 classes (1 to 10)
             class_weights_binary=binary_weights,
-            class_weights_child=child_weights
+            class_weights_child=child_weights,
         )
     except ImportError:
-        print("FATAL ERROR: HierarchicalClassifier could not be imported. Ensure modeling_custom.py is correct.")
+        print(
+            "FATAL ERROR: HierarchicalClassifier could not be imported. Ensure modeling_custom.py is correct."
+        )
         exit(1)
 
     # Setup Training Arguments - configured for multi-GPU via Accelerate
@@ -177,7 +188,7 @@ if __name__ == "__main__":
         train_df=train_df,
         binary_weights=binary_weights,
         child_weights=child_weights,
-        output_dir=OUTPUT_DIR
+        output_dir=OUTPUT_DIR,
     )
-    
+
     print(f"\nFinal model and tokenizer saved to {OUTPUT_DIR}")

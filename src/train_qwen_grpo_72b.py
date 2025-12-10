@@ -12,7 +12,7 @@ from grpo.rewards import (
     formatting,
     length_penalty,
     headline_adherence,
-    coherence_penalty
+    coherence_penalty,
 )
 from grpo.cli import parse_args
 
@@ -36,8 +36,12 @@ def main():
     # Load datasets
     print(f"Loading datasets from {args.train_data_file} and {args.test_data_file}...")
     try:
-        train_dataset = load_dataset("parquet", data_files=args.train_data_file, split="train")
-        test_dataset = load_dataset("parquet", data_files=args.test_data_file, split="train")
+        train_dataset = load_dataset(
+            "parquet", data_files=args.train_data_file, split="train"
+        )
+        test_dataset = load_dataset(
+            "parquet", data_files=args.test_data_file, split="train"
+        )
     except Exception as e:
         print(f"Error loading datasets. Ensure the paths are correct. Error: {e}")
         return
@@ -58,7 +62,15 @@ def main():
     peft_config = LoraConfig(
         r=64,
         lora_alpha=128,  # Increased for better learning with larger r
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
@@ -72,7 +84,7 @@ def main():
         formatting,
         length_penalty,
         headline_adherence,
-        coherence_penalty
+        coherence_penalty,
     ]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
 
@@ -111,7 +123,7 @@ def main():
         eval_dataset=test_dataset,
         peft_config=peft_config,
     )
-    
+
     print("Starting GRPO training...")
     trainer.train()
     print("Training complete.")
@@ -136,7 +148,7 @@ def main():
                     max_new_tokens=100,
                     temperature=0.8,
                     do_sample=True,
-                    pad_token_id=tokenizer.pad_token_id
+                    pad_token_id=tokenizer.pad_token_id,
                 )
                 response = tokenizer.decode(outputs[0], skip_special_tokens=True)
                 if prompt in response:
@@ -146,5 +158,5 @@ def main():
 
 
 if __name__ == "__main__":
-    os.environ['VLLM_CONFIGURE_LOGGING'] = '0'
+    os.environ["VLLM_CONFIGURE_LOGGING"] = "0"
     main()
