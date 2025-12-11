@@ -1,30 +1,29 @@
 compute_environment: LOCAL_MACHINE
 debug: false
 distributed_type: FSDP
+num_machines: 1
+num_processes: 4  # Matches your 4 available A100 GPUs
+gpu_ids: all
+mixed_precision: bf16 # Essential for memory efficiency and speed on A100s
 downcast_bf16: 'no'
-enable_cpu_affinity: false
 fsdp_config:
-  # NOTE: activation checkpointing is handled by gradient_checkpointing in training script
-  # Don't enable both - causes issues with gradient flow
-  fsdp_activation_checkpointing: false
+  fsdp_offload_params: true 
+  fsdp_sharding_strategy: FULL_SHARD 
+  fsdp_activation_checkpointing: false 
   fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
   fsdp_backward_prefetch: BACKWARD_PRE
-  fsdp_cpu_ram_efficient_loading: true
   fsdp_forward_prefetch: true
-  fsdp_offload_params: false
-  fsdp_sharding_strategy: FULL_SHARD
+  fsdp_cpu_ram_efficient_loading: true # For efficient loading of large sharded models
   fsdp_state_dict_type: SHARDED_STATE_DICT
   fsdp_sync_module_states: true
   fsdp_use_orig_params: true
-gpu_ids: all
+
 machine_rank: 0
 main_training_function: main
-mixed_precision: bf16
-num_machines: 1
-num_processes: 4
 rdzv_backend: static
 same_network: true
+enable_cpu_affinity: false
+use_cpu: false
 tpu_env: []
 tpu_use_cluster: false
 tpu_use_sudo: false
-use_cpu: false

@@ -101,6 +101,7 @@ def main():
         hub_model_id=f"KonradBRG/{model_name}",
         # For distributed training
         ddp_find_unused_parameters=False,
+        gradient_checkpointing_kwargs={"offload_to_cpu": True},
     )
 
     trainer = GRPOTrainer(
