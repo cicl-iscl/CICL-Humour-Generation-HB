@@ -35,10 +35,6 @@ python train_qwen_grpo.py \
     --joke_rater_model "KonradBRG/joke-rater-xlm-roberta" \
     --num_train_epochs 1 \
     --learning_rate 5e-6 \
-    --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 8 \
-    --generation_batch_size 4 \
-    --num_generations 4 \
     --max_completion_length 48
 
 # Check exit status
