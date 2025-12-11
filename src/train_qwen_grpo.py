@@ -72,7 +72,6 @@ def main():
         headline_adherence,
         coherence_penalty,
     ]
-    # Weights from notebook: [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     model_name = args.model_id.split("/")[-1] + "-Jokester"
     # Configure GRPO Training
@@ -81,8 +80,6 @@ def main():
         report_to=args.report_to,
         num_train_epochs=args.num_train_epochs,
         max_steps=args.max_steps,
-        use_vllm=True,
-        vllm_mode="colocate",
         max_completion_length=args.max_completion_length,
         temperature=0.8,
         generation_batch_size=args.generation_batch_size,
