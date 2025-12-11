@@ -77,7 +77,7 @@ def parse_args():
     parser.add_argument(
         "--per_device_eval_batch_size",
         type=int,
-        default=1,
+        default=4,
         help="Batch size per device for evaluation.",
     )
     parser.add_argument(
