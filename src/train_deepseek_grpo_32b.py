@@ -3,7 +3,7 @@ import torch
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import LoraConfig
+from peft import LoraConfig, get_peft_model
 from dotenv import load_dotenv
 from grpo.rewards import (
     roberta_score,
@@ -77,6 +77,12 @@ def main():
         task_type="CAUSAL_LM",
     )
 
+    # Apply PEFT manually and cast to bfloat16 to avoid dtype mismatch
+    # (LoRA adapters default to float32, but base model is bfloat16)
+    model = get_peft_model(model, peft_config)
+    model = model.to(torch.bfloat16)
+    print(f"Applied LoRA and cast to bfloat16. Trainable params: {model.print_trainable_parameters()}")
+
     # Weights from notebook: [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     reward_fns = [
         roberta_score,
@@ -122,7 +128,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
-        peft_config=peft_config,
+        # peft_config removed - we manually applied PEFT above with bfloat16 casting
     )
 
     print("Starting GRPO training...")
