@@ -92,5 +92,11 @@ def parse_args():
         default=8,
         help="Gradient accumulation steps.",
     )
+    parser.add_argument(
+        "--joke_rater_model",
+        type=str,
+        default="KonradBRG/joke-rater-xlm-roberta",
+        help="HuggingFace model ID for the joke rater used in reward scoring.",
+    )
 
     return parser.parse_args()

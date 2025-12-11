@@ -46,6 +46,7 @@ accelerate launch --config_file accelerate_config_fsdp_72b.yaml \
     --output_dir "./checkpoints/qwen72b_grpo" \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
+    --joke_rater_model "KonradBRG/joke-rater-xlm-roberta" \
     --num_train_epochs 1 \
     --learning_rate 1e-6 \
     --per_device_train_batch_size 1 \

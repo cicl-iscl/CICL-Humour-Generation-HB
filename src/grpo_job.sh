@@ -48,6 +48,7 @@ accelerate launch --config_file accelerate_config_a100.yaml \
     --output_dir "./checkpoints/qwen7b_grpo" \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
+    --joke_rater_model "KonradBRG/joke-rater-xlm-roberta" \
     --num_train_epochs 1 \
     --learning_rate 5e-6 \
     --per_device_train_batch_size 1 \

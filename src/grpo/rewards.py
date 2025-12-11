@@ -88,10 +88,6 @@ def structure_diversity_reward(completions, **kwargs):
     return scores
 
 
-scoring_pipe = None
-_scoring_pipe_device = None
-
-
 def _get_current_device():
     """Get the current device for this process in distributed training."""
     if torch.cuda.is_available():
@@ -101,44 +97,63 @@ def _get_current_device():
     return -1
 
 
-def roberta_score(completions, **kwargs):
+def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
     """
-    Scores humor using RoBERTA, but only for valid outputs.
-    Invalid outputs get 0.0 regardless of what the model thinks.
+    Factory function that creates a roberta_score function configured with a specific model.
 
-    NOTE: In distributed training, this loads the model on each process's GPU.
+    Args:
+        model_id: HuggingFace model ID for the joke rater model.
+
+    Returns:
+        A roberta_score function that uses the specified model.
     """
-    global scoring_pipe, _scoring_pipe_device
+    scoring_pipe = None
+    _scoring_pipe_device = None
 
-    current_device = _get_current_device()
+    def roberta_score(completions, **kwargs):
+        """
+        Scores humor using the joke rater model, but only for valid outputs.
+        Invalid outputs get 0.0 regardless of what the model thinks.
 
-    # Load or reload pipeline if device changed (shouldn't happen, but safety check)
-    if scoring_pipe is None or _scoring_pipe_device != current_device:
-        print(f"Loading RoBERTA Joke Rater Pipeline on device {current_device}...")
-        scoring_pipe = pipeline(
-            "text-classification",
-            model="KonradBRG/RoBERTA-Joke-Rater",
-            trust_remote_code=True,
-            device=current_device,
-        )
-        _scoring_pipe_device = current_device
-        print("RoBERTA Pipeline loaded.")
+        NOTE: In distributed training, this loads the model on each process's GPU.
+        """
+        nonlocal scoring_pipe, _scoring_pipe_device
 
-    # Only score completions that are valid jokes to reduce computation
-    valid_completions = [c for c in completions if is_valid_single_joke(c)]
-    valid_indices = [i for i, c in enumerate(completions) if is_valid_single_joke(c)]
+        current_device = _get_current_device()
 
-    # Initialize all scores to 0.0 (for invalid jokes)
-    final_scores = [0.0] * len(completions)
+        # Load or reload pipeline if device changed (shouldn't happen, but safety check)
+        if scoring_pipe is None or _scoring_pipe_device != current_device:
+            print(f"Loading Joke Rater Pipeline ({model_id}) on device {current_device}...")
+            scoring_pipe = pipeline(
+                "text-classification",
+                model=model_id,
+                trust_remote_code=True,
+                device=current_device,
+            )
+            _scoring_pipe_device = current_device
+            print("Joke Rater Pipeline loaded.")
 
-    if valid_completions:
-        # Get scores for valid jokes
-        roberta_labels = scoring_pipe(valid_completions)
-        for idx, roberta_label in zip(valid_indices, roberta_labels):
-            score = float(roberta_label["label"])
-            final_scores[idx] = score
+        # Only score completions that are valid jokes to reduce computation
+        valid_completions = [c for c in completions if is_valid_single_joke(c)]
+        valid_indices = [i for i, c in enumerate(completions) if is_valid_single_joke(c)]
 
-    return final_scores
+        # Initialize all scores to 0.0 (for invalid jokes)
+        final_scores = [0.0] * len(completions)
+
+        if valid_completions:
+            # Get scores for valid jokes
+            roberta_labels = scoring_pipe(valid_completions)
+            for idx, roberta_label in zip(valid_indices, roberta_labels):
+                score = float(roberta_label["label"])
+                final_scores[idx] = score
+
+        return final_scores
+
+    return roberta_score
+
+
+# Default roberta_score for backwards compatibility
+roberta_score = create_roberta_score_fn()
 
 
 def word_pair_prompt_adherence(completions, prompts, **kwargs):

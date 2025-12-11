@@ -6,7 +6,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import LoraConfig, get_peft_model
 from dotenv import load_dotenv
 from grpo.rewards import (
-    roberta_score,
+    create_roberta_score_fn,
     structure_diversity_reward,
     word_pair_prompt_adherence,
     formatting,
@@ -83,9 +83,13 @@ def main():
     model = model.to(torch.bfloat16)
     print(f"Applied LoRA and cast to bfloat16. Trainable params: {model.print_trainable_parameters()}")
 
+    # Create joke rater reward function with the specified model
+    roberta_score_fn = create_roberta_score_fn(args.joke_rater_model)
+    print(f"Using joke rater model: {args.joke_rater_model}")
+
     # Weights from notebook: [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
     reward_fns = [
-        roberta_score,
+        roberta_score_fn,
         structure_diversity_reward,
         word_pair_prompt_adherence,
         formatting,

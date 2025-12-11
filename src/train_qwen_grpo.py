@@ -5,7 +5,7 @@ from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
 from grpo.rewards import (
-    roberta_score,
+    create_roberta_score_fn,
     structure_diversity_reward,
     word_pair_prompt_adherence,
     formatting,
@@ -57,9 +57,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # Create joke rater reward function with the specified model
+    roberta_score_fn = create_roberta_score_fn(args.joke_rater_model)
+    print(f"Using joke rater model: {args.joke_rater_model}")
+
     # Define Reward Function List and Weights (matching notebook grpo_poc.ipynb)
     reward_fns = [
-        roberta_score,
+        roberta_score_fn,
         structure_diversity_reward,
         word_pair_prompt_adherence,
         formatting,

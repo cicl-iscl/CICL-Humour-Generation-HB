@@ -58,7 +58,10 @@ def setup_custom_config_and_save(
     """
     Registers and updates the model's configuration for saving/sharing with
     custom attributes and auto_map for the custom model class.
+    Also copies the modeling_custom.py file to the output directory so the
+    model can be loaded with trust_remote_code=True.
     """
+    import shutil
 
     HierarchicalClassifier.config_class = HierarchicalConfig
     AutoConfig.register("xlm-roberta-joke-rater", HierarchicalConfig)
@@ -91,6 +94,13 @@ def setup_custom_config_and_save(
     os.makedirs(output_dir, exist_ok=True)
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
+
+    # Copy modeling_custom.py to output directory for trust_remote_code loading
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    modeling_src = os.path.join(script_dir, "joke_rater", "modeling_custom.py")
+    modeling_dst = os.path.join(output_dir, "modeling_custom.py")
+    shutil.copy2(modeling_src, modeling_dst)
+    print(f"Copied modeling_custom.py to {output_dir}")
 
     print("\nCustom config and model registered and saved successfully.")
     print(f"Generated id2label: {id2label}")
