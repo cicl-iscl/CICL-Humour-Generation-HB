@@ -35,7 +35,7 @@ class HierarchicalClassifier(XLMRobertaPreTrainedModel):
     and child) and a combined loss function including classification and regression.
     """
 
-    config_class = XLMRobertaConfig
+    config_class = HierarchicalConfig
 
     def __init__(
         self,
@@ -157,7 +157,7 @@ class HierarchicalDebertaClassifier(DebertaV2PreTrainedModel):
     and child) and a combined loss function including classification and regression.
     """
 
-    config_class = DebertaV2Config
+    config_class = HierarchicalDebertaConfig
 
     def __init__(
         self,

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=Qwen7B_GRPO
+#SBATCH --job-name=Qwen1.5B_GRPO
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
