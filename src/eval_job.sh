@@ -31,17 +31,19 @@ mkdir -p logs eval_results
 
 MODELS=(
     # Base models (for comparison)
-    "Qwen/Qwen2.5-7B-Instruct"
-    "Qwen/Qwen2.5-32B-Instruct"
+    "Qwen/Qwen2.5-3B-Instruct"
+    # "Qwen/Qwen2.5-32B-Instruct"
     # Trained models (uncomment after training)
+    "./checkpoints/qwen3b_grpo",
     # "./checkpoints/qwen7b_grpo"
     # "./checkpoints/qwen32b_grpo"
     # "./checkpoints/deepseek_r1_32b_grpo"
 )
 
 MODEL_NAMES=(
-    "Qwen-7B-Base"
-    "Qwen-32B-Base"
+    "Qwen-3B-Base"
+    # "Qwen-32B-Base"
+    "Qwen-3B-GRPO"
     # "Qwen-7B-GRPO"
     # "Qwen-32B-GRPO"
     # "DeepSeek-R1-32B-GRPO"
