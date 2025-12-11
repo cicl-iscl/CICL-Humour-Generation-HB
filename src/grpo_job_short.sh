@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=Qwen1.5B_GRPO
+#SBATCH --job-name=Qwen3B_GRPO
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -44,18 +44,18 @@ echo "Using Accelerate config: accelerate_config_a100.yaml"
 
 accelerate launch --config_file accelerate_config_a100.yaml \
     train_qwen_grpo.py \
-    --model_id "Qwen/Qwen2.5-1.5B-Instruct" \
-    --output_dir "./checkpoints/qwen1.5b_grpo" \
+    --model_id "Qwen/Qwen2.5-3B-Instruct" \
+    --output_dir "./checkpoints/qwen3b_grpo" \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test.parquet" \
     --joke_rater_model "KonradBRG/joke-rater-xlm-roberta" \
-    --num_train_epochs 1 \
+    --max_steps 100 \
     --learning_rate 5e-6 \
-    --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 8 \
-    --generation_batch_size 4 \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 4 \
+    --generation_batch_size 8 \
     --num_generations 4 \
-    --max_completion_length 64
+    --max_completion_length 48
 
 # Check exit status
 if [ $? -eq 0 ]; then

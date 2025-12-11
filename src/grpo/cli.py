@@ -37,6 +37,12 @@ def parse_args():
         help="Number of epochs to train the model.",
     )
     parser.add_argument(
+        "--max_steps",
+        type=int,
+        default=-1,
+        help="Maximum number of training steps. Overrides num_train_epochs if > 0.",
+    )
+    parser.add_argument(
         "--learning_rate",
         type=float,
         default=1e-6,
