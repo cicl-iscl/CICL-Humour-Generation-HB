@@ -1,5 +1,6 @@
 import os
 import torch
+import weave
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -80,22 +81,21 @@ def main():
         report_to=args.report_to,
         num_train_epochs=args.num_train_epochs,
         max_steps=args.max_steps,
-        use_vllm=False,
-        vllm_mode=None,
+        use_vllm=True,
+        vllm_mode="colocate",
         max_completion_length=args.max_completion_length,
-        temperature=0.7,  # Higher temperature for more exploration (matching notebook)
+        temperature=0.8,
         generation_batch_size=args.generation_batch_size,
         num_generations=args.num_generations,
         reward_weights=reward_weights,
         learning_rate=args.learning_rate,
-        logging_steps=10,
         eval_strategy="epoch" if args.max_steps <= 0 else "no",
-        save_strategy="steps",
+        save_strategy="no",
         save_steps=500 if args.max_steps <= 0 else min(50, args.max_steps),
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
-        gradient_checkpointing=False,  # Disable for better gradient flow in RL
+        gradient_checkpointing=True,
         bf16=True,
         push_to_hub=True,
         hub_model_id=f"KonradBRG/{model_name}",
