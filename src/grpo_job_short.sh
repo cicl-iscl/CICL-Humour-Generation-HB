@@ -39,10 +39,12 @@ cd $PROJECT_ROOT/src
 mkdir -p logs
 
 # 6. Execute the Training with Accelerate
+# NOTE: Models >7B need FSDP (accelerate_config_fsdp_32b.yaml) instead of DDP
+# Models <=7B can use DDP (accelerate_config_a100.yaml) which is faster
 echo "Starting GRPO training on $SLURM_JOB_NUM_NODES node(s) with 4 A100 GPUs..."
-echo "Using Accelerate config: accelerate_config_a100.yaml"
+echo "Using Accelerate config: accelerate_config_fsdp_32b.yaml"
 
-accelerate launch --config_file accelerate_config_a100.yaml \
+accelerate launch --config_file accelerate_config_fsdp_32b.yaml \
     train_qwen_grpo.py \
     --model_id "Qwen/Qwen2.5-3B-Instruct" \
     --output_dir "./checkpoints/qwen3b_grpo" \

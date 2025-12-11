@@ -34,7 +34,7 @@ MODELS=(
     "Qwen/Qwen2.5-3B-Instruct"
     # "Qwen/Qwen2.5-32B-Instruct"
     # Trained models (uncomment after training)
-    "./checkpoints/qwen3b_grpo",
+    "./checkpoints/qwen3b_grpo"
     # "./checkpoints/qwen7b_grpo"
     # "./checkpoints/qwen32b_grpo"
     # "./checkpoints/deepseek_r1_32b_grpo"
