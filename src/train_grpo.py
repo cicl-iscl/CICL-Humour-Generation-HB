@@ -1,6 +1,13 @@
+"""
+Train a language-specific GRPO joke generation model.
+
+Usage (single GPU, no accelerate):
+    python train_grpo.py --language en --model_id Qwen/Qwen2.5-7B-Instruct
+    python train_grpo.py --language zh --model_id Qwen/Qwen2.5-7B-Instruct
+    python train_grpo.py --language es --model_id Qwen/Qwen2.5-7B-Instruct
+"""
 import os
 import torch
-import weave
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -26,6 +33,7 @@ def main():
 
     # Load datasets
     print(f"Loading datasets from {args.train_data_file} and {args.test_data_file}...")
+    print(f"Training language: {args.language}")
     try:
         train_dataset = load_dataset(
             "parquet", data_files=args.train_data_file, split="train"
@@ -37,9 +45,14 @@ def main():
         print(f"Error loading datasets. Ensure the paths are correct. Error: {e}")
         return
 
-    # For FSDP/DDP: don't set device_map, let Accelerate handle placement
+    # Single GPU training - explicitly set device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_id, torch_dtype=torch.bfloat16
+        args.model_id,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
     )
 
     # Ensure model is in training mode with gradients enabled
@@ -62,7 +75,7 @@ def main():
     roberta_score_fn = create_roberta_score_fn(args.joke_rater_model)
     print(f"Using joke rater model: {args.joke_rater_model}")
 
-    # Define Reward Function List and Weights (matching notebook grpo_poc.ipynb)
+    # Define Reward Function List and Weights
     reward_fns = [
         roberta_score_fn,
         structure_diversity_reward,
@@ -73,7 +86,11 @@ def main():
         coherence_penalty,
     ]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
-    model_name = args.model_id.split("/")[-1] + "-Jokester"
+
+    # Create model name based on language
+    lang_suffix = {"en": "English", "zh": "Chinese", "es": "Spanish"}[args.language]
+    model_name = f"{args.model_id.split('/')[-1]}-Jokester-{lang_suffix}"
+
     # Configure GRPO Training
     training_args = GRPOConfig(
         output_dir=args.output_dir,
@@ -96,9 +113,7 @@ def main():
         bf16=True,
         push_to_hub=True,
         hub_model_id=f"KonradBRG/{model_name}",
-        # For distributed training
-        ddp_find_unused_parameters=False,
-        gradient_checkpointing_kwargs={"offload_to_cpu": True},
+        gradient_checkpointing_kwargs={"use_reentrant": False},
     )
 
     trainer = GRPOTrainer(
@@ -110,7 +125,7 @@ def main():
         eval_dataset=test_dataset,
     )
 
-    print("Starting GRPO training...")
+    print(f"Starting GRPO training for {lang_suffix} jokes...")
     trainer.train()
     print("Training complete.")
 
@@ -118,27 +133,32 @@ def main():
     trainer.save_model()
     print(f"Model saved to {args.output_dir}")
 
-    # Only run generation demo on main process
-    if trainer.accelerator.is_main_process:
-        print("\n--- Example Joke Generation Post-Training ---")
-        model.eval()
+    # Run generation demo
+    print(f"\n--- Example {lang_suffix} Joke Generation Post-Training ---")
+    model.eval()
 
-        prompt = "Generate the funniest possible joke that contains these two words: 'microwave', 'shoes'. Return only the joke."
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    # Language-specific prompts
+    prompts = {
+        "en": "Generate the funniest possible joke that contains these two words: 'microwave', 'shoes'. Return only the joke.",
+        "zh": "生成一个包含这两个词的最有趣的笑话：'电脑', '咖啡'。只返回笑话。",
+        "es": "Genera el chiste más gracioso posible que contenga estas dos palabras: 'computadora', 'café'. Devuelve solo el chiste.",
+    }
+    prompt = prompts[args.language]
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
-        with torch.no_grad():
-            for i in range(5):
-                outputs = model.generate(
-                    **inputs,
-                    max_new_tokens=64,
-                    temperature=0.8,
-                    do_sample=True,
-                    pad_token_id=tokenizer.pad_token_id,
-                )
-                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                response = response[len(prompt) :].strip()
-                print(f"Joke {i+1}: {response}")
-                print("-" * 24)
+    with torch.no_grad():
+        for i in range(5):
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=64,
+                temperature=0.8,
+                do_sample=True,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            response = response[len(prompt) :].strip()
+            print(f"Joke {i+1}: {response}")
+            print("-" * 24)
 
 
 if __name__ == "__main__":

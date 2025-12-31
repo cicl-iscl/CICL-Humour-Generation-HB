@@ -1,3 +1,11 @@
+"""
+Train a language-specific RoBERTa joke rater model.
+
+Usage:
+    python train_roberta.py --language en --output_dir ./roberta-en
+    python train_roberta.py --language zh --output_dir ./roberta-zh
+    python train_roberta.py --language es --output_dir ./roberta-es
+"""
 import os
 import numpy as np
 import torch
@@ -46,6 +54,8 @@ def get_cross_entropy_weights(train_ds):
         dtype=float,
     )
 
+    # Handle zero counts to avoid division by zero
+    child_counts = np.maximum(child_counts, 1)
     child_weights = child_counts.sum() / (num_child_classes * child_counts)
     child_weights = torch.tensor(child_weights, dtype=torch.float)
 
@@ -119,13 +129,19 @@ if __name__ == "__main__":
     NUM_TRAIN_EPOCHS = args.num_train_epochs
     LEARNING_RATE = args.learning_rate
     TRAIN_BATCH_SIZE = args.per_device_train_batch_size
+    LANGUAGE = args.language
+    DATA_DIR = args.data_dir
 
     print(f"--- Starting Training ---")
     print(f"Model: {MODEL_NAME}")
+    print(f"Language: {LANGUAGE}")
     print(f"Output Directory: {OUTPUT_DIR}")
+    print(f"Data Directory: {DATA_DIR}")
 
-    # Data Loading and Preprocessing
-    datasets, tokenizer, train_df = load_datasets(MODEL_NAME)
+    # Data Loading and Preprocessing (language-specific)
+    datasets, tokenizer, train_df = load_datasets(
+        MODEL_NAME, language=LANGUAGE, data_dir=DATA_DIR
+    )
     train_ds = datasets["train"]
     val_ds = datasets["validation"]
     test_ds = datasets["test"]
@@ -150,7 +166,7 @@ if __name__ == "__main__":
         )
         exit(1)
 
-    # Setup Training Arguments - configured for multi-GPU via Accelerate
+    # Setup Training Arguments - single GPU, no accelerate
     training_args = TrainingArguments(
         output_dir=OUTPUT_DIR,
         per_device_train_batch_size=TRAIN_BATCH_SIZE,
@@ -169,9 +185,8 @@ if __name__ == "__main__":
         push_to_hub=True,
         hub_model_id=HUB_MODEL_ID,
         optim="adamw_torch",
-        bf16=True,  # Use bf16 for faster training on A100/H100
+        bf16=True,
         dataloader_num_workers=4,
-        ddp_find_unused_parameters=False,
         logging_steps=50,
     )
 

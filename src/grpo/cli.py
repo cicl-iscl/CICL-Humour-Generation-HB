@@ -104,5 +104,12 @@ def parse_args():
         default="KonradBRG/joke-rater-xlm-roberta",
         help="HuggingFace model ID for the joke rater used in reward scoring.",
     )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="en",
+        choices=["en", "zh", "es"],
+        help="Language for training: 'en' (English), 'zh' (Chinese), 'es' (Spanish).",
+    )
 
     return parser.parse_args()

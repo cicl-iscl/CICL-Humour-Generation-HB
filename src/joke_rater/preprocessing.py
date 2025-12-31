@@ -1,25 +1,58 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from datasets import Dataset, DatasetDict
-from transformers import XLMRobertaTokenizer
-from dotenv import load_dotenv
+from transformers import AutoTokenizer
 
 
-def build_joke_dataset():
+def load_english_data(data_dir: str = "../data"):
+    """Load English joke data from combined_jokes_full.csv."""
+    df = pd.read_csv(f"{data_dir}/combined_jokes_full.csv")
+    df = df[["joke", "labels"]].dropna()
+    df["labels"] = df["labels"].astype(int)
+    return df
+
+
+def load_chinese_data(data_dir: str = "../data"):
+    """Load Chinese joke data from zh_data_labeled.csv."""
+    df = pd.read_csv(f"{data_dir}/zh_data_labeled.csv")
+    df["labels"] = df["score"].astype(int)
+    df = df[["joke", "labels"]].dropna()
+    return df
+
+
+def load_spanish_data(data_dir: str = "../data"):
+    """Load Spanish joke data from es_data_labeled_llama3.1.csv."""
+    df = pd.read_csv(f"{data_dir}/es_data_labeled_llama3.1.csv")
+    df["labels"] = df["score"].astype(int)
+    df = df[["joke", "labels"]].dropna()
+    return df
+
+
+def build_joke_dataset(language: str = "all", data_dir: str = "../data"):
     """
-    Loads English, Chinese, and Spanish joke data, processes it, and returns a single DataFrame.
-    """
-    eval_df = pd.read_csv("../data/combined_jokes_full.csv")
-    eval_df_zh = pd.read_csv("../data/zh_data_labeled_qwen7b.csv")
-    eval_df_es = pd.read_csv("../data/es_data_labeled_llama3.1.csv")
-    eval_df_zh["labels"] = eval_df_zh.score.astype(int)
-    eval_df_es["labels"] = eval_df_es.score.astype(int)
-    eval_df_zh = eval_df_zh[["joke", "labels"]].dropna()
-    eval_df_es = eval_df_es[["joke", "labels"]].dropna()
-    
-    eval_df = eval_df[["joke", "labels"]].dropna()
+    Loads joke data for specified language(s) and returns a single DataFrame.
 
-    return pd.concat([eval_df, eval_df_zh, eval_df_es], ignore_index=True)
+    Args:
+        language: One of "en", "zh", "es", or "all" for multilingual
+        data_dir: Path to data directory
+
+    Returns:
+        DataFrame with columns ['joke', 'labels']
+    """
+    if language == "en":
+        return load_english_data(data_dir)
+    elif language == "zh":
+        return load_chinese_data(data_dir)
+    elif language == "es":
+        return load_spanish_data(data_dir)
+    elif language == "all":
+        # Load all three languages for multilingual training
+        eval_df_en = load_english_data(data_dir)
+        eval_df_zh = load_chinese_data(data_dir)
+        eval_df_es = load_spanish_data(data_dir)
+        return pd.concat([eval_df_en, eval_df_zh, eval_df_es], ignore_index=True)
+    else:
+        raise ValueError(f"Unknown language: {language}. Use 'en', 'zh', 'es', or 'all'.")
 
 
 def get_train_test_split(eval_df, test_size=0.2, random_state=42):
@@ -46,14 +79,21 @@ def get_train_test_split(eval_df, test_size=0.2, random_state=42):
     return train_ds, test_ds, val_ds, train_df
 
 
-def load_datasets(model_name):
+def load_datasets(model_name: str, language: str = "all", data_dir: str = "../data"):
     """
     Main function to load and preprocess data, returning a DatasetDict.
+
+    Args:
+        model_name: HuggingFace model name for tokenizer
+        language: One of "en", "zh", "es", or "all"
+        data_dir: Path to data directory
     """
-    eval_df = build_joke_dataset()
+    eval_df = build_joke_dataset(language=language, data_dir=data_dir)
+    print(f"Loaded {len(eval_df)} jokes for language: {language}")
+
     train_ds, test_ds, val_ds, train_df = get_train_test_split(eval_df)
 
-    tokenizer = XLMRobertaTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def tokenize(batch):
         return tokenizer(

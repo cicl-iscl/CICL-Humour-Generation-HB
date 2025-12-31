@@ -41,4 +41,17 @@ def parse_args():
         default=32,
         help="Batch size per GPU for training.",
     )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="all",
+        choices=["en", "zh", "es", "all"],
+        help="Language to train on: 'en' (English), 'zh' (Chinese), 'es' (Spanish), or 'all' (multilingual).",
+    )
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default="../data",
+        help="Path to the data directory.",
+    )
     return parser.parse_args()
