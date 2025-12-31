@@ -30,8 +30,10 @@ echo "Starting ablation study..."
 
 python ablation_study.py \
     --num_epochs 10 \
+    --num_epochs_frozen 20 \
     --batch_size 32 \
     --learning_rate 2e-5 \
+    --learning_rate_frozen 1e-3 \
     --output_dir "./ablation_results"
 
 # Check exit status

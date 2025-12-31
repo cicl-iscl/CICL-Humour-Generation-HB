@@ -1,7 +1,12 @@
 """
 Ablation study comparing HierarchicalClassifier with different backbones:
-- xlm-roberta-large (fine-tuned vs not fine-tuned)
-- mdeberta-v3-base (fine-tuned vs not fine-tuned)
+- xlm-roberta-large (full fine-tuning vs frozen backbone)
+- mdeberta-v3-base (full fine-tuning vs frozen backbone)
+
+For a fair comparison:
+- Full fine-tuning: Train entire model with low LR (2e-5), 10 epochs
+- Frozen backbone: Freeze transformer, train only classification head
+  with higher LR (1e-3), more epochs (20), no weight decay
 
 Outputs a table with Accuracy and MAE on the test split.
 """
@@ -34,6 +39,12 @@ def parse_args():
         help="Number of training epochs for fine-tuned models",
     )
     parser.add_argument(
+        "--num_epochs_frozen",
+        type=int,
+        default=20,
+        help="Number of training epochs for frozen backbone models (typically needs more)",
+    )
+    parser.add_argument(
         "--batch_size",
         type=int,
         default=32,
@@ -43,7 +54,13 @@ def parse_args():
         "--learning_rate",
         type=float,
         default=2e-5,
-        help="Learning rate for fine-tuning",
+        help="Learning rate for fine-tuning (full model)",
+    )
+    parser.add_argument(
+        "--learning_rate_frozen",
+        type=float,
+        default=1e-3,
+        help="Learning rate for frozen backbone (head-only training, typically higher)",
     )
     parser.add_argument(
         "--output_dir",
@@ -124,22 +141,74 @@ def prepare_datasets(model_name: str):
     return datasets, tokenizer, train_df
 
 
-def evaluate_model(model, test_ds, tokenizer, batch_size: int = 32):
-    """Evaluate a model on the test set without training."""
+def freeze_backbone(model):
+    """Freeze the transformer backbone, keeping only classification head trainable."""
+    # Freeze the backbone (roberta or deberta)
+    if hasattr(model, "roberta"):
+        for param in model.roberta.parameters():
+            param.requires_grad = False
+    elif hasattr(model, "deberta"):
+        for param in model.deberta.parameters():
+            param.requires_grad = False
+
+    # Ensure classification heads remain trainable
+    trainable_modules = ["proj1", "proj2", "binary_head", "child_head", "dropout"]
+    for name, param in model.named_parameters():
+        if any(module in name for module in trainable_modules):
+            param.requires_grad = True
+
+    # Log trainable parameters
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in model.parameters())
+    print(f"  Trainable params: {trainable:,} / {total:,} ({100*trainable/total:.2f}%)")
+
+    return model
+
+
+def train_frozen_backbone(
+    model,
+    datasets,
+    tokenizer,
+    num_epochs: int,
+    batch_size: int,
+    learning_rate: float,
+    output_dir: str,
+):
+    """Train only the classification head with frozen backbone."""
+    # Freeze backbone
+    model = freeze_backbone(model)
+
     training_args = TrainingArguments(
-        output_dir="./tmp_eval",
+        output_dir=output_dir,
+        per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
+        num_train_epochs=num_epochs,
+        learning_rate=learning_rate,
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        save_total_limit=1,
+        load_best_model_at_end=True,
+        metric_for_best_model="mae",
+        greater_is_better=False,
+        warmup_ratio=0.05,  # Less warmup for frozen backbone
+        weight_decay=0.0,   # No weight decay for head-only training
         report_to="none",
         bf16=torch.cuda.is_available(),
+        logging_steps=50,
     )
 
     trainer = Trainer(
         model=model,
         args=training_args,
+        train_dataset=datasets["train"],
+        eval_dataset=datasets["validation"],
         compute_metrics=compute_metrics,
     )
 
-    results = trainer.predict(test_ds)
+    trainer.train()
+
+    # Evaluate on test set
+    results = trainer.predict(datasets["test"])
     return results.metrics
 
 
@@ -215,31 +284,35 @@ def run_ablation(args):
         binary_weights, child_weights = get_cross_entropy_weights(datasets["train"])
         n_labels = len(train_df.labels.unique())
 
-        # --- No Fine-tuning ---
-        print(f"\n[{config['name']}] Evaluating WITHOUT fine-tuning...")
-        model_no_ft = config["model_class"].from_pretrained(
+        # --- Frozen Backbone (train head only) ---
+        print(f"\n[{config['name']}] Training with FROZEN backbone (head-only)...")
+        print(f"  Using LR={args.learning_rate_frozen}, epochs={args.num_epochs_frozen}")
+        model_frozen = config["model_class"].from_pretrained(
             config["model_id"],
             num_child_labels=n_labels - 1,
             class_weights_binary=binary_weights,
             class_weights_child=child_weights,
         )
 
-        metrics_no_ft = evaluate_model(
-            model_no_ft,
-            datasets["test"],
+        metrics_frozen = train_frozen_backbone(
+            model_frozen,
+            datasets,
             tokenizer,
-            args.batch_size,
+            num_epochs=args.num_epochs_frozen,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate_frozen,
+            output_dir=f"{args.output_dir}/{config['name'].replace('/', '_')}_frozen",
         )
 
         results.append({
             "Model": config["name"],
-            "Fine-tuned": "No",
-            "Accuracy": f"{metrics_no_ft['test_accuracy']:.4f}",
-            "MAE": f"{metrics_no_ft['test_mae']:.4f}",
+            "Fine-tuned": "No (frozen backbone)",
+            "Accuracy": f"{metrics_frozen['test_accuracy']:.4f}",
+            "MAE": f"{metrics_frozen['test_mae']:.4f}",
         })
 
         # Free memory
-        del model_no_ft
+        del model_frozen
         torch.cuda.empty_cache()
 
         # --- With Fine-tuning ---
