@@ -13,9 +13,9 @@ def load_english_data(data_dir: str = "../data"):
 
 
 def load_chinese_data(data_dir: str = "../data"):
-    """Load Chinese joke data from zh_data_labeled.csv."""
-    df = pd.read_csv(f"{data_dir}/zh_data_labeled.csv")
-    df["labels"] = df["score"].astype(int)
+    """Load Chinese joke data from zh_jokes_combined.tsv."""
+    df = pd.read_csv(f"{data_dir}/zh_jokes_combined.tsv", sep='\t')
+    df["labels"] = df.average_weighted.astype(int)
     df = df[["joke", "labels"]].dropna()
     return df
 
