@@ -44,7 +44,6 @@ def get_cross_entropy_weights(train_ds):
     # 1. Binary Weights (0 vs. 1-10)
     binary_counts = np.array([(labels == 0).sum(), (labels != 0).sum()], dtype=float)
     binary_weights = binary_counts.sum() / (2 * binary_counts)
-    binary_weights = torch.tensor(binary_weights, dtype=torch.float)
 
     # 2. Child Weights (1 to 10, only for non-zero labels)
     child_labels = labels[labels != 0]
