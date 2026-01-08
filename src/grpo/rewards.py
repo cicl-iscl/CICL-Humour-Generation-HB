@@ -3,7 +3,7 @@ import emoji
 import re
 from collections import deque
 import torch
-from transformers import pipeline
+from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
 
 
 def is_valid_single_joke(text):
@@ -124,10 +124,17 @@ def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
         # Load or reload pipeline if device changed (shouldn't happen, but safety check)
         if scoring_pipe is None or _scoring_pipe_device != current_device:
             print(f"Loading Joke Rater Pipeline ({model_id}) on device {current_device}...")
+            # Load model and tokenizer explicitly with trust_remote_code
+            # This ensures the custom model architecture is properly loaded
+            model = AutoModelForSequenceClassification.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
             scoring_pipe = pipeline(
                 "text-classification",
-                model=model_id,
-                trust_remote_code=True,
+                model=model,
+                tokenizer=tokenizer,
                 device=current_device,
             )
             _scoring_pipe_device = current_device

@@ -38,6 +38,9 @@ def get_cross_entropy_weights(train_ds):
     """
     Calculates class weights for binary and child classification tasks to handle
     class imbalance using the formula: weight_i = total_count / (num_classes * count_i).
+
+    Returns Python lists (JSON serializable) for config storage.
+    The model will convert them to tensors internally.
     """
     labels = np.array(train_ds["labels"])
 
@@ -56,9 +59,9 @@ def get_cross_entropy_weights(train_ds):
     # Handle zero counts to avoid division by zero
     child_counts = np.maximum(child_counts, 1)
     child_weights = child_counts.sum() / (num_child_classes * child_counts)
-    child_weights = torch.tensor(child_weights, dtype=torch.float)
 
-    return list(binary_weights), list(child_weights)
+    # Return as Python lists (JSON serializable)
+    return binary_weights.tolist(), child_weights.tolist()
 
 
 def setup_custom_config_and_save(
