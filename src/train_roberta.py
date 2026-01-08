@@ -216,3 +216,17 @@ if __name__ == "__main__":
     )
 
     print(f"\nFinal model and tokenizer saved to {OUTPUT_DIR}")
+
+    # Upload modeling_custom.py to HuggingFace Hub for trust_remote_code loading
+    from huggingface_hub import HfApi
+    api = HfApi()
+    modeling_file = os.path.join(OUTPUT_DIR, "modeling_custom.py")
+    if os.path.exists(modeling_file):
+        print(f"Uploading modeling_custom.py to {HUB_MODEL_ID}...")
+        api.upload_file(
+            path_or_fileobj=modeling_file,
+            path_in_repo="modeling_custom.py",
+            repo_id=HUB_MODEL_ID,
+            repo_type="model",
+        )
+        print("modeling_custom.py uploaded successfully.")
