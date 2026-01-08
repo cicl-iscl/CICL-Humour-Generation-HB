@@ -58,7 +58,7 @@ def get_cross_entropy_weights(train_ds):
     child_weights = child_counts.sum() / (num_child_classes * child_counts)
     child_weights = torch.tensor(child_weights, dtype=torch.float)
 
-    return binary_weights, child_weights
+    return list(binary_weights), list(child_weights)
 
 
 def setup_custom_config_and_save(
