@@ -132,7 +132,7 @@ def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
                 config=config,
                 trust_remote_code=True,
             )
-            tokenizer = XLMRobertaTokenizer.from_pretrained(model_id, trust_remote_code=True)
+            tokenizer = XLMRobertaTokenizer.from_pretrained("xlm-roberta-large")
             scoring_pipe = pipeline(
                 "text-classification",
                 model=model,
