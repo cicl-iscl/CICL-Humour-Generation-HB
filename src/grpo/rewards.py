@@ -3,7 +3,7 @@ import emoji
 import re
 from collections import deque
 import torch
-from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer, AutoConfig
+from transformers import pipeline, AutoModelForSequenceClassification, XLMRobertaTokenizer, XLMRobertaForSequenceClassification, AutoConfig
 
 
 def is_valid_single_joke(text):
@@ -127,12 +127,12 @@ def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
             # Load config, model and tokenizer explicitly with trust_remote_code
             # Must load config first to register the custom model type
             config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
-            model = AutoModelForSequenceClassification.from_pretrained(
+            model = XLMRobertaForSequenceClassification.from_pretrained(
                 model_id,
                 config=config,
                 trust_remote_code=True,
             )
-            tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+            tokenizer = XLMRobertaTokenizer.from_pretrained(model_id, trust_remote_code=True)
             scoring_pipe = pipeline(
                 "text-classification",
                 model=model,
