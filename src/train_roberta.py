@@ -21,6 +21,60 @@ from joke_rater.preprocessing import load_datasets
 from joke_rater.modeling_custom import HierarchicalConfig, HierarchicalClassifier
 
 
+def register_and_prepare_custom_model(
+    model,
+    train_df,
+    binary_weights,
+    child_weights,
+):
+    """
+    Ensures the custom HierarchicalConfig + HierarchicalClassifier
+    are properly registered, attached to the model, and serialized
+    correctly when saving or pushing to the Hub.
+    """
+
+    HierarchicalClassifier.config_class = HierarchicalConfig
+
+    AutoConfig.register(
+        HierarchicalConfig.model_type,
+        HierarchicalConfig,
+        exist_ok=True,
+    )
+    AutoModelForSequenceClassification.register(
+        HierarchicalConfig,
+        HierarchicalClassifier,
+        exist_ok=True,
+    )
+
+    current_config = model.config.to_dict()
+    model.config = HierarchicalConfig(**current_config)
+    n_labels = len(train_df.labels.unique())  # should be 11
+
+    model.config.num_child_labels = n_labels - 1
+    model.config.class_weights_binary = (
+        binary_weights.tolist()
+        if hasattr(binary_weights, "tolist")
+        else binary_weights
+    )
+    model.config.class_weights_child = (
+        child_weights.tolist()
+        if hasattr(child_weights, "tolist")
+        else child_weights
+    )
+
+    unique_labels = sorted(train_df["labels"].unique())
+    model.config.id2label = {i: int(l) for i, l in enumerate(unique_labels)}
+    model.config.label2id = {v: k for k, v in model.config.id2label.items()}
+    model.config.num_labels = n_labels
+
+    model.config.auto_map = {
+        "AutoConfig": "modeling_custom.HierarchicalConfig",
+        "AutoModelForSequenceClassification": "modeling_custom.HierarchicalClassifier",
+    }
+
+    return model
+
+
 def compute_metrics(eval_pred):
     """
     Computes RMSE, MAE, and Accuracy for the model's predictions.
@@ -157,10 +211,18 @@ if __name__ == "__main__":
 
         model = HierarchicalClassifier.from_pretrained(
             MODEL_NAME,
-            num_child_labels=n_labels - 1,  # 10 classes (1 to 10)
+            num_child_labels=n_labels - 1,
             class_weights_binary=binary_weights,
             class_weights_child=child_weights,
         )
+
+        model = register_and_prepare_custom_model(
+            model=model,
+            train_df=train_df,
+            binary_weights=binary_weights,
+            child_weights=child_weights,
+        )
+
     except ImportError:
         print(
             "FATAL ERROR: HierarchicalClassifier could not be imported. Ensure modeling_custom.py is correct."
