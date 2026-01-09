@@ -8,7 +8,6 @@ Usage:
 """
 import os
 import numpy as np
-import torch
 from dotenv import load_dotenv
 from sklearn.metrics import root_mean_squared_error, accuracy_score, mean_absolute_error
 from transformers import (
@@ -87,8 +86,8 @@ def setup_custom_config_and_save(
 
     n_labels = len(train_df.labels.unique())  # Should be 11 (0-10)
     model.config.num_child_labels = n_labels - 1  # 10
-    model.config.class_weights_binary = binary_weights.tolist()
-    model.config.class_weights_child = child_weights.tolist()
+    model.config.class_weights_binary = binary_weights  # Already a list
+    model.config.class_weights_child = child_weights  # Already a list
 
     unique_labels = sorted(train_df["labels"].unique())  # [0, 1, ..., 10]
     id2label = {int(i): int(label) for i, label in enumerate(unique_labels)}

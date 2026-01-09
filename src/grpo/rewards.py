@@ -166,24 +166,35 @@ roberta_score = create_roberta_score_fn()
 
 
 def word_pair_prompt_adherence(completions, prompts, **kwargs):
-    """Enforces the word pair constraint (cell 8)."""
+    """Enforces the word pair constraint - works for EN/ZH/ES prompts."""
     scores = []
-    pattern = r"contains\s+these\s+two\s+words:\s*'([^']+)'\s*,\s*'([^']+)'"
+    # Patterns for different languages
+    patterns = [
+        # English: "using these two words: 'w1', 'w2'" or "contains these two words: 'w1', 'w2'"
+        r"(?:using|contains)\s+these\s+two\s+words:\s*'([^']+)'\s*,\s*'([^']+)'",
+        # Chinese: "用这两个词...：'w1'、'w2'"
+        r"用这两个词[^：]*：\s*'([^']+)'[、,]\s*'([^']+)'",
+        # Spanish: "usando estas dos palabras: 'w1', 'w2'"
+        r"usando\s+estas\s+dos\s+palabras:\s*'([^']+)'\s*,\s*'([^']+)'",
+    ]
+
     for i in range(len(completions)):
         p = prompts[i]
-        # Skip if not a word pair task
-        if "two words" not in p:
+
+        # Try to find word pairs using any pattern
+        w1, w2 = None, None
+        for pattern in patterns:
+            matches = re.findall(pattern, p, flags=re.IGNORECASE)
+            if matches:
+                w1, w2 = matches[0]
+                break
+
+        # Skip if no word pair found (headline task or unknown format)
+        if w1 is None or w2 is None:
             scores.append(None)
             continue
 
         c = completions[i].lower()
-        try:
-            # Extract the two required words from the prompt
-            w1, w2 = re.findall(pattern, p, flags=re.IGNORECASE)[0]
-        except IndexError:
-            scores.append(None)
-            continue
-
         w1_lower = w1.lower().strip()
         w2_lower = w2.lower().strip()
 
