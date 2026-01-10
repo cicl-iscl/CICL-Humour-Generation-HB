@@ -14,12 +14,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
 from grpo.rewards import (
     create_roberta_score_fn,
-    structure_diversity_reward,
+    create_structure_diversity_reward_fn,
+    create_formatting_fn,
+    create_length_penalty_fn,
+    create_headline_adherence_fn,
+    create_coherence_penalty_fn,
     word_pair_prompt_adherence,
-    formatting,
-    length_penalty,
-    headline_adherence,
-    coherence_penalty,
 )
 from grpo.cli import parse_args
 
@@ -57,10 +57,6 @@ def main():
 
     # Ensure model is in training mode with gradients enabled
     model.train()
-    for param in model.parameters():
-        param.requires_grad = True
-
-    # Debug: print trainable params
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in model.parameters())
     print(
@@ -71,23 +67,30 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Create joke rater reward function with the specified model
-    roberta_score_fn = create_roberta_score_fn(args.joke_rater_model)
+    # Create language-aware reward functions
+    lang = args.language
+    roberta_score_fn = create_roberta_score_fn(args.joke_rater_model, language=lang)
+    structure_diversity_fn = create_structure_diversity_reward_fn(lang)
+    formatting_fn = create_formatting_fn(lang)
+    length_penalty_fn = create_length_penalty_fn(lang)
+    headline_adherence_fn = create_headline_adherence_fn(lang)
+    coherence_penalty_fn = create_coherence_penalty_fn(lang)
+
     print(f"Using joke rater model: {args.joke_rater_model}")
+    print(f"All reward functions configured for language: {lang}")
 
     # Define Reward Function List and Weights
     reward_fns = [
         roberta_score_fn,
-        structure_diversity_reward,
+        structure_diversity_fn,
         word_pair_prompt_adherence,
-        formatting,
-        length_penalty,
-        headline_adherence,
-        coherence_penalty,
+        formatting_fn,
+        length_penalty_fn,
+        headline_adherence_fn,
+        coherence_penalty_fn,
     ]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
 
-    # Create model name based on language
     lang_suffix = {"en": "English", "zh": "Chinese", "es": "Spanish"}[args.language]
     model_name = f"{args.model_id.split('/')[-1]}-Jokester-{lang_suffix}"
 

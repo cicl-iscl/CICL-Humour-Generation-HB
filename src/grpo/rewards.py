@@ -6,32 +6,63 @@ import torch
 from transformers import pipeline, AutoModelForSequenceClassification, XLMRobertaTokenizer, XLMRobertaForSequenceClassification, AutoConfig
 
 
-def is_valid_single_joke(text):
-    """
-    Combat joke stacking.
-    """
+def is_valid_single_joke_en(text):
+    """Combat joke stacking (English)."""
     if text.count("?") > 1:
         return False
-    # Using 'why ' instead of 'why ' is crucial due to tokenization/word boundaries
     if text.lower().count("why ") > 1:
         return False
-    if "Q:" in text.lower() or "A:" in text.lower():
-        return False
-    if (
-        '"' in text or "-" in text
-    ):  # This is a strong heuristic; consider refining it if it's too aggressive.
+    if "q:" in text.lower() or "a:" in text.lower():
         return False
     if len(text.strip().split("\n")) > 3:
         return False
-
     return True
+
+
+def is_valid_single_joke_zh(text):
+    """Combat joke stacking (Chinese)."""
+    if text.count("？") > 1:
+        return False
+    if text.count("为什么") > 1:
+        return False
+    if "问：" in text or "答：" in text:
+        return False
+    if len(text.strip().split("\n")) > 3:
+        return False
+    return True
+
+
+def is_valid_single_joke_es(text):
+    """Combat joke stacking (Spanish)."""
+    if text.count("?") + text.count("¿") > 2:  # ¿...? counts as one question
+        return False
+    if text.lower().count("por qué") > 1:
+        return False
+    if "p:" in text.lower() or "r:" in text.lower():  # Pregunta/Respuesta
+        return False
+    if len(text.strip().split("\n")) > 3:
+        return False
+    return True
+
+
+def create_is_valid_single_joke_fn(language: str = "en"):
+    """Factory function to get the appropriate validator for a language."""
+    if language == "zh":
+        return is_valid_single_joke_zh
+    elif language == "es":
+        return is_valid_single_joke_es
+    return is_valid_single_joke_en
+
+
+# Default for backwards compatibility
+is_valid_single_joke = is_valid_single_joke_en
 
 
 recent_structures = deque(maxlen=30)
 
 
 def extract_joke_structure(joke: str) -> str:
-    """Extracts common joke structures using regex."""
+    """Extracts common joke structures using regex (English)."""
     joke_lower = joke.lower()
 
     if re.search(
@@ -59,33 +90,100 @@ def extract_joke_structure(joke: str) -> str:
         return "one-liner"
 
 
-def structure_diversity_reward(completions, **kwargs):
-    """Calculates reward based on structure novelty relative to recent history (cell 6)."""
-    global recent_structures
-    scores = []
-    freq = {}
+def extract_joke_structure_zh(joke: str) -> str:
+    """Extracts common joke structures using regex (Chinese)."""
+    # Chinese patterns for common joke structures
+    if re.search(r"为什么", joke):
+        return "why-did"
+    elif re.search(r"(在哪|哪里|哪儿)", joke):
+        return "where-did"
+    elif re.search(r"怎么", joke):
+        return "how-did"
+    elif re.search(r"(什么叫|叫什么|算什么)", joke):
+        return "what-do-you-call"
+    elif re.search(r"(敲门|咚咚)", joke):
+        return "knock-knock"
+    elif "？" in joke and ("！" in joke or "。" in joke):
+        return "qa-punchline"
+    elif any(phrase in joke for phrase in ["就像", "好比", "仿佛"]):
+        return "observation"
+    else:
+        return "one-liner"
 
-    # Calculate frequencies of existing structures in the history
-    for s in recent_structures:
-        freq[s] = freq.get(s, 0) + 1
 
-    total = max(len(recent_structures), 1)
-    num_structures = len(freq) if freq else 1
-    # Target is equal distribution (e.g., if 5 structures, target is 1/5 = 0.2)
-    target = 1 / num_structures
+def extract_joke_structure_es(joke: str) -> str:
+    """Extracts common joke structures using regex (Spanish)."""
+    joke_lower = joke.lower()
 
-    for joke in completions:
-        s = extract_joke_structure(joke)
-        actual = freq.get(s, 0) / total
-        reward = target - actual
-        scores.append(reward)
+    if re.search(r"(¿)?por\s*qué", joke_lower):
+        return "why-did"
+    elif re.search(r"(¿)?dónde", joke_lower):
+        return "where-did"
+    elif re.search(r"(¿)?cómo", joke_lower):
+        return "how-did"
+    elif re.search(r"(¿)?cómo\s+se\s+llama", joke_lower) or re.search(r"(¿)?qué\s+es", joke_lower):
+        return "what-do-you-call"
+    elif re.search(r"toc\s*toc", joke_lower):
+        return "knock-knock"
+    elif ("?" in joke or "¿" in joke) and ("!" in joke or "¡" in joke or "." in joke):
+        return "qa-punchline"
+    elif any(phrase in joke_lower for phrase in [" es como ", " parece ", " cuando "]):
+        return "observation"
+    else:
+        return "one-liner"
 
-        # Update history and frequency for the NEXT joke/step
-        recent_structures.append(s)
-        freq[s] = freq.get(s, 0) + 1
-        total += 1
 
-    return scores
+def create_structure_diversity_reward_fn(language: str = "en"):
+    """
+    Factory function that creates a structure_diversity_reward function for a specific language.
+
+    Args:
+        language: Language code ("en", "zh", or "es").
+
+    Returns:
+        A structure_diversity_reward function configured for the specified language.
+    """
+    # Select the appropriate structure extractor based on language
+    if language == "zh":
+        extractor = extract_joke_structure_zh
+    elif language == "es":
+        extractor = extract_joke_structure_es
+    else:
+        extractor = extract_joke_structure
+
+    def structure_diversity_reward(completions, **kwargs):
+        """Calculates reward based on structure novelty relative to recent history (cell 6)."""
+        global recent_structures
+        scores = []
+        freq = {}
+
+        # Calculate frequencies of existing structures in the history
+        for s in recent_structures:
+            freq[s] = freq.get(s, 0) + 1
+
+        total = max(len(recent_structures), 1)
+        num_structures = len(freq) if freq else 1
+        # Target is equal distribution (e.g., if 5 structures, target is 1/5 = 0.2)
+        target = 1 / num_structures
+
+        for joke in completions:
+            s = extractor(joke)
+            actual = freq.get(s, 0) / total
+            reward = target - actual
+            scores.append(reward)
+
+            # Update history and frequency for the NEXT joke/step
+            recent_structures.append(s)
+            freq[s] = freq.get(s, 0) + 1
+            total += 1
+
+        return scores
+
+    return structure_diversity_reward
+
+
+# Default structure_diversity_reward for backwards compatibility
+structure_diversity_reward = create_structure_diversity_reward_fn("en")
 
 
 def _get_current_device():
@@ -97,18 +195,20 @@ def _get_current_device():
     return -1
 
 
-def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
+def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta", language: str = "en"):
     """
     Factory function that creates a roberta_score function configured with a specific model.
 
     Args:
         model_id: HuggingFace model ID for the joke rater model.
+        language: Language code ("en", "zh", or "es") for validation.
 
     Returns:
         A roberta_score function that uses the specified model.
     """
     scoring_pipe = None
     _scoring_pipe_device = None
+    validator = create_is_valid_single_joke_fn(language)
 
     def roberta_score(completions, **kwargs):
         """
@@ -143,10 +243,8 @@ def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
             print("Joke Rater Pipeline loaded.")
 
         # Only score completions that are valid jokes to reduce computation
-        valid_completions = [c for c in completions if is_valid_single_joke(c)]
-        valid_indices = [i for i, c in enumerate(completions) if is_valid_single_joke(c)]
-
-        # Initialize all scores to 0.0 (for invalid jokes)
+        valid_completions = [c for c in completions if validator(c)]
+        valid_indices = [i for i, c in enumerate(completions) if validator(c)]
         final_scores = [0.0] * len(completions)
 
         if valid_completions:
@@ -213,28 +311,61 @@ def word_pair_prompt_adherence(completions, prompts, **kwargs):
     return scores
 
 
-def headline_adherence(completions, prompts, **kwargs):
-    """Simple check for headline tasks (cell 8)."""
-    scores = []
-    for i, completion in enumerate(completions):
+def create_headline_adherence_fn(language: str = "en"):
+    """
+    Factory function that creates a headline adherence function for a specific language.
+    """
+    # Patterns to detect word-pair tasks (should skip these)
+    word_pair_patterns = {
+        "en": ["two words", "these words"],
+        "zh": ["两个词", "这两个词"],
+        "es": ["dos palabras", "estas palabras"],
+    }
+    skip_patterns = word_pair_patterns.get(language, word_pair_patterns["en"])
 
-        # Skip if it's a word pair task
-        if "two words" in prompts[i]:
-            scores.append(None)
-            continue
+    # Bad patterns in completions (conversational artifacts)
+    bad_patterns_by_lang = {
+        "en": ["headline", "generate"],
+        "zh": ["标题", "生成"],
+        "es": ["titular", "genera"],
+    }
+    bad_patterns = bad_patterns_by_lang.get(language, bad_patterns_by_lang["en"])
 
-        # The prompt is a headline task.
-        if len(completion.split()) <= 25:
-            # Check for bad patterns (like repeating the prompt or being conversational)
-            if "headline" in completion.lower() or "generate" in completion.lower():
-                scores.append(-1.0)
+    # Max length (words for en/es, characters for zh)
+    max_length = {"en": 25, "zh": 50, "es": 28}[language]
+    use_chars = language == "zh"
+
+    def headline_adherence(completions, prompts, **kwargs):
+        """Simple check for headline tasks (cell 8)."""
+        scores = []
+        for i, completion in enumerate(completions):
+            # Skip if it's a word pair task
+            if any(pattern in prompts[i].lower() for pattern in skip_patterns):
+                scores.append(None)
+                continue
+
+            # Calculate length
+            if use_chars:
+                length = len(re.sub(r'\s', '', completion))
             else:
-                scores.append(
-                    1.0
-                )  # Small positive reward for conforming to length/format
-        else:
-            scores.append(-1.0)
-    return scores
+                length = len(completion.split())
+
+            # The prompt is a headline task.
+            if length <= max_length:
+                # Check for bad patterns (like repeating the prompt or being conversational)
+                if any(pattern in completion.lower() for pattern in bad_patterns):
+                    scores.append(-1.0)
+                else:
+                    scores.append(1.0)  # Small positive reward for conforming to length/format
+            else:
+                scores.append(-1.0)
+        return scores
+
+    return headline_adherence
+
+
+# Default for backwards compatibility
+headline_adherence = create_headline_adherence_fn("en")
 
 
 def contains_emoji_func(text):
@@ -242,57 +373,96 @@ def contains_emoji_func(text):
     return any(char in emoji.EMOJI_DATA for char in text)
 
 
-def formatting(completions, **kwargs):
-    """Validates output formatting and penalizes hacking patterns (cell 9)."""
-    scores = []
-    for completion in completions:
-        is_penalized = False
-        # Penalties for conversational artifacts/bad symbols
-        if (
-            "#" in completion
-            or "How about: " in completion
-            or "This joke" in completion
-            or "Let me know" in completion
-            or "Note: " in completion
-            or "   " in completion  # Multiple spaces
-            or contains_emoji_func(completion)
-        ):
-            scores.append(-1.0)
-            is_penalized = True
-        # Penalty for joke stacking/invalid structure
-        elif not is_valid_single_joke(completion):
-            scores.append(-1.0)
-            is_penalized = True
+def create_formatting_fn(language: str = "en"):
+    """
+    Factory function that creates a formatting reward function for a specific language.
+    """
+    validator = create_is_valid_single_joke_fn(language)
 
-        if not is_penalized:
-            scores.append(1.0)
+    # Language-specific bad patterns
+    bad_patterns_by_lang = {
+        "en": ["How about: ", "This joke", "Let me know", "Note: ", "Here's"],
+        "zh": ["这个笑话", "怎么样", "注意：", "提示：", "让我", "好的，"],
+        "es": ["Qué tal: ", "Este chiste", "Avísame", "Nota: ", "Aquí tienes"],
+    }
+    bad_patterns = bad_patterns_by_lang.get(language, bad_patterns_by_lang["en"])
 
-    return scores
+    def formatting(completions, **kwargs):
+        """Validates output formatting and penalizes hacking patterns (cell 9)."""
+        scores = []
+        for completion in completions:
+            is_penalized = False
+            # Penalties for conversational artifacts/bad symbols
+            if (
+                "#" in completion
+                or any(pattern in completion for pattern in bad_patterns)
+                or "   " in completion  # Multiple spaces
+                or contains_emoji_func(completion)
+            ):
+                scores.append(-1.0)
+                is_penalized = True
+            # Penalty for joke stacking/invalid structure
+            elif not validator(completion):
+                scores.append(-1.0)
+                is_penalized = True
 
+            if not is_penalized:
+                scores.append(1.0)
 
-def length_penalty(completions, **kwargs):
-    """Penalizes outputs outside the optimal 5-24 word range (cell 9)."""
-    scores = []
-    optimal_length = 16
-    max_allowed = 24
-    min_allowed = 5
+        return scores
 
-    for completion in completions:
-        word_count = len(completion.split())
-
-        if word_count > max_allowed or word_count < min_allowed:
-            scores.append(-2.0)  # Severe penalty
-        else:
-            # Smooth penalty for being over optimal length (16 words)
-            deviation = max(0, word_count - optimal_length)
-            penalty = -0.2 * deviation
-            scores.append(penalty)
-
-    return scores
+    return formatting
 
 
-def compute_coherence_penalty(joke: str, penalty_weight: float = 0.5) -> float:
-    """Penalize incoherent jokes with rare/technical terms (cell 9)."""
+# Default for backwards compatibility
+formatting = create_formatting_fn("en")
+
+
+def create_length_penalty_fn(language: str = "en"):
+    """
+    Factory function that creates a length penalty function for a specific language.
+    Chinese uses character count; English/Spanish use word count.
+    """
+    # Language-specific length parameters
+    # Chinese: character-based (roughly 2-3 chars per "word equivalent")
+    # English/Spanish: word-based
+    length_params = {
+        "en": {"min": 5, "max": 24, "optimal": 16, "use_chars": False},
+        "zh": {"min": 10, "max": 60, "optimal": 35, "use_chars": True},
+        "es": {"min": 5, "max": 28, "optimal": 18, "use_chars": False},  # Spanish words are longer
+    }
+    params = length_params.get(language, length_params["en"])
+
+    def length_penalty(completions, **kwargs):
+        """Penalizes outputs outside the optimal length range (cell 9)."""
+        scores = []
+        for completion in completions:
+            if params["use_chars"]:
+                # For Chinese: count characters (excluding spaces/punctuation)
+                length = len(re.sub(r'\s', '', completion))
+            else:
+                # For English/Spanish: count words
+                length = len(completion.split())
+
+            if length > params["max"] or length < params["min"]:
+                scores.append(-2.0)  # Severe penalty
+            else:
+                # Smooth penalty for being over optimal length
+                deviation = max(0, length - params["optimal"])
+                penalty = -0.2 * deviation
+                scores.append(penalty)
+
+        return scores
+
+    return length_penalty
+
+
+# Default for backwards compatibility
+length_penalty = create_length_penalty_fn("en")
+
+
+def compute_coherence_penalty_latin(joke: str, penalty_weight: float = 0.5) -> float:
+    """Penalize incoherent jokes with rare/technical terms (Latin alphabet languages)."""
     rare_word_pattern = r"\b[A-Z][a-z]*(?:-[a-z]+)*\b"
     rare_words = len(re.findall(rare_word_pattern, joke))
 
@@ -306,6 +476,36 @@ def compute_coherence_penalty(joke: str, penalty_weight: float = 0.5) -> float:
     return 0.0
 
 
-def coherence_penalty(completions, **kwargs):
-    """Wrapper for the coherence penalty"""
-    return [compute_coherence_penalty(c) for c in completions]
+def compute_coherence_penalty_zh(joke: str, penalty_weight: float = 0.5) -> float:
+    """Penalize incoherent jokes (Chinese) - checks for excessive punctuation or repetition."""
+    # Check for excessive punctuation (more than 10% of chars are punctuation)
+    punct_pattern = r'[，。！？、；：""''【】《》（）]'
+    punct_count = len(re.findall(punct_pattern, joke))
+    char_count = len(re.sub(r'\s', '', joke))
+
+    if char_count > 0:
+        punct_ratio = punct_count / char_count
+        if punct_ratio > 0.15:
+            return -penalty_weight * (punct_ratio - 0.15)
+
+    return 0.0
+
+
+def create_coherence_penalty_fn(language: str = "en"):
+    """
+    Factory function that creates a coherence penalty function for a specific language.
+    """
+    if language == "zh":
+        compute_fn = compute_coherence_penalty_zh
+    else:
+        compute_fn = compute_coherence_penalty_latin
+
+    def coherence_penalty(completions, **kwargs):
+        """Wrapper for the coherence penalty"""
+        return [compute_fn(c) for c in completions]
+
+    return coherence_penalty
+
+
+# Default for backwards compatibility
+coherence_penalty = create_coherence_penalty_fn("en")
