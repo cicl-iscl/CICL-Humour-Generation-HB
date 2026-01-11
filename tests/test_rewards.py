@@ -4,6 +4,7 @@ Test script for GRPO reward functions.
 Usage:
     python tests/test_rewards.py
     python tests/test_rewards.py --skip-roberta  # Skip slow roberta tests
+    python tests/test_rewards.py --only-roberta  # Run only roberta tests
     python tests/test_rewards.py --data-dir ../data  # Test with parquet data
 """
 import sys
@@ -604,6 +605,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Test reward functions")
     parser.add_argument("--skip-roberta", action="store_true", help="Skip slow roberta tests")
+    parser.add_argument("--only-roberta", action="store_true", help="Run only roberta tests")
     parser.add_argument("--data-dir", type=str, default=None, help="Directory with parquet data files")
     args = parser.parse_args()
 
@@ -611,29 +613,33 @@ def main():
     print("REWARD FUNCTION TESTS")
     print("="*60)
 
-    # Run all tests
-    test_word_pair_prompt_adherence()
-    test_is_valid_single_joke()
-    test_extract_joke_structure()
-    test_formatting()
-    test_length_penalty()
-    test_headline_adherence()
-    test_coherence_penalty()
-
-    if not args.skip_roberta:
+    if args.only_roberta:
+        # Run only roberta tests
         test_roberta_score()
     else:
-        print("\n[SKIPPED] roberta_score tests (use without --skip-roberta to run)")
+        # Run all non-roberta tests
+        test_word_pair_prompt_adherence()
+        test_is_valid_single_joke()
+        test_extract_joke_structure()
+        test_formatting()
+        test_length_penalty()
+        test_headline_adherence()
+        test_coherence_penalty()
 
-    if args.data_dir:
-        test_with_parquet_data(args.data_dir)
-    else:
-        # Try default location
-        default_data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-        if os.path.exists(default_data_dir):
-            test_with_parquet_data(default_data_dir)
+        if not args.skip_roberta:
+            test_roberta_score()
         else:
-            print("\n[SKIPPED] parquet data tests (use --data-dir to specify location)")
+            print("\n[SKIPPED] roberta_score tests (use without --skip-roberta to run)")
+
+        if args.data_dir:
+            test_with_parquet_data(args.data_dir)
+        else:
+            # Try default location
+            default_data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+            if os.path.exists(default_data_dir):
+                test_with_parquet_data(default_data_dir)
+            else:
+                print("\n[SKIPPED] parquet data tests (use --data-dir to specify location)")
 
     # Print summary
     success = results.summary()
