@@ -40,7 +40,7 @@ python3 train_roberta.py \
     --data_dir "$PROJECT_ROOT/data" \
     --output_dir "./checkpoints/roberta-es" \
     --hub_model_id "KonradBRG/joke-rater-roberta-es" \
-    --num_train_epochs 100 \
+    --num_train_epochs 10 \
     --learning_rate 5e-5 \
     --per_device_train_batch_size 32
 
