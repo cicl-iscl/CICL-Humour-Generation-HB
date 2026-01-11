@@ -3,7 +3,7 @@ import emoji
 import re
 from collections import deque
 import torch
-from transformers import pipeline, AutoModelForSequenceClassification, XLMRobertaTokenizer, XLMRobertaForSequenceClassification, AutoConfig
+from transformers import pipeline, AutoModelForSequenceClassification, XLMRobertaTokenizer, AutoConfig
 
 
 def is_valid_single_joke_en(text):

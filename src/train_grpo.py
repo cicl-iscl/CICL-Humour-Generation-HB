@@ -10,7 +10,7 @@ import os
 import torch
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainerCallback
 from dotenv import load_dotenv
 from grpo.rewards import (
     create_roberta_score_fn,
@@ -22,6 +22,102 @@ from grpo.rewards import (
     word_pair_prompt_adherence,
 )
 from grpo.cli import parse_args
+
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
+
+class GenerationLoggingCallback(TrainerCallback):
+    """Callback to log sample generations with reward metrics to wandb."""
+
+    def __init__(
+        self,
+        tokenizer,
+        reward_fns,
+        reward_names,
+        reward_weights,
+        sample_prompts,
+        log_every_n_steps: int = 50,
+        num_samples: int = 4,
+    ):
+        self.tokenizer = tokenizer
+        self.reward_fns = reward_fns
+        self.reward_names = reward_names
+        self.reward_weights = reward_weights
+        self.sample_prompts = sample_prompts
+        self.log_every_n_steps = log_every_n_steps
+        self.num_samples = num_samples
+
+    def on_step_end(self, args, state, control, model=None, **kwargs):
+        if not WANDB_AVAILABLE or wandb.run is None:
+            return
+
+        if state.global_step % self.log_every_n_steps != 0:
+            return
+
+        if model is None:
+            return
+
+        # Generate samples
+        model.eval()
+        prompts = self.sample_prompts[: self.num_samples]
+        generations = []
+
+        with torch.no_grad():
+            for prompt in prompts:
+                inputs = self.tokenizer(prompt, return_tensors="pt").to(model.device)
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=64,
+                    temperature=0.8,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                # Extract just the generated part
+                generation = response[len(prompt):].strip()
+                generations.append(generation)
+
+        model.train()
+
+        # Compute rewards for each generation
+        table_data = []
+        for i, (prompt, generation) in enumerate(zip(prompts, generations)):
+            row = {
+                "step": state.global_step,
+                "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
+                "generation": generation,
+            }
+
+            total_weighted_reward = 0.0
+            for fn, name, weight in zip(self.reward_fns, self.reward_names, self.reward_weights):
+                try:
+                    # Call reward function with single completion
+                    if "prompts" in fn.__code__.co_varnames:
+                        scores = fn([generation], prompts=[prompt])
+                    else:
+                        scores = fn([generation])
+                    score = scores[0] if scores[0] is not None else 0.0
+                except Exception:
+                    score = 0.0
+
+                row[name] = round(score, 3) if score is not None else None
+                if score is not None:
+                    total_weighted_reward += weight * score
+
+            row["total_reward"] = round(total_weighted_reward, 3)
+            table_data.append(row)
+
+        # Log to wandb as a table
+        columns = ["step", "prompt", "generation"] + self.reward_names + ["total_reward"]
+        table = wandb.Table(columns=columns)
+        for row in table_data:
+            table.add_data(*[row.get(col, None) for col in columns])
+
+        wandb.log({f"generations/step_{state.global_step}": table}, step=state.global_step)
 
 
 def main():
@@ -79,7 +175,7 @@ def main():
     print(f"Using joke rater model: {args.joke_rater_model}")
     print(f"All reward functions configured for language: {lang}")
 
-    # Define Reward Function List and Weights
+    # Define Reward Function List, Names, and Weights
     reward_fns = [
         roberta_score_fn,
         structure_diversity_fn,
@@ -89,10 +185,22 @@ def main():
         headline_adherence_fn,
         coherence_penalty_fn,
     ]
+    reward_names = [
+        "roberta_score",
+        "structure_diversity",
+        "word_pair_adherence",
+        "formatting",
+        "length_penalty",
+        "headline_adherence",
+        "coherence_penalty",
+    ]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
 
     lang_suffix = {"en": "English", "zh": "Chinese", "es": "Spanish"}[args.language]
     model_name = f"{args.model_id.split('/')[-1]}-Jokester-{lang_suffix}"
+
+    # Get sample prompts for logging callback
+    sample_prompts = train_dataset["prompt"][:8]  # Take first 8 prompts for sampling
 
     # Configure GRPO Training
     training_args = GRPOConfig(
@@ -119,6 +227,17 @@ def main():
         gradient_checkpointing_kwargs={"use_reentrant": False},
     )
 
+    # Create generation logging callback
+    generation_callback = GenerationLoggingCallback(
+        tokenizer=tokenizer,
+        reward_fns=reward_fns,
+        reward_names=reward_names,
+        reward_weights=reward_weights,
+        sample_prompts=sample_prompts,
+        log_every_n_steps=50,
+        num_samples=4,
+    )
+
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
@@ -126,6 +245,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
+        callbacks=[generation_callback],
     )
 
     print(f"Starting GRPO training for {lang_suffix} jokes...")
