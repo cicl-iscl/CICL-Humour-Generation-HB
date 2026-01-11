@@ -235,12 +235,13 @@ def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta", 
                 model_id,
                 trust_remote_code=True,
             )
-            tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True, trust_remote_code=True)
             scoring_pipe = pipeline(
                 "text-classification",
                 model=model,
                 tokenizer=tokenizer,
                 device=current_device,
+                trust_remote_code=True,
             )
             _scoring_pipe_device = current_device
             print("Joke Rater Pipeline loaded.")
