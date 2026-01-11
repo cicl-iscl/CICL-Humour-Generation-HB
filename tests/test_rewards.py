@@ -381,42 +381,91 @@ def test_coherence_penalty():
     print("\n[DONE] coherence_penalty tests completed")
 
 
-def test_roberta_score(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
-    """Test roberta scoring on sample jokes."""
+def test_roberta_score():
+    """Test roberta scoring on sample jokes for all language models."""
     print("\n" + "="*60)
-    print(f"Testing roberta_score with {model_id}")
+    print("Testing roberta_score for all language models")
     print("="*60)
 
-    try:
-        roberta_fn = create_roberta_score_fn(model_id, language="en")
+    # Test configurations for each language
+    test_configs = [
+        {
+            "model_id": "KonradBRG/joke-rater-roberta-en",
+            "language": "en",
+            "jokes": [
+                "Why did the scarecrow win an award? Because he was outstanding in his field!",
+                "I told my wife she was drawing her eyebrows too high. She looked surprised.",
+                "What do you call a fake noodle? An impasta!",
+                "This is not a joke at all, just a regular sentence.",
+                "Why? Why? Why did this happen? Q: What? A: Nothing.",  # Invalid format
+            ],
+            "invalid_idx": 4,
+        },
+        {
+            "model_id": "KonradBRG/joke-rater-roberta-zh",
+            "language": "zh",
+            "jokes": [
+                "为什么程序员喜欢黑暗？因为光会产生bug！",
+                "我告诉我的猫一个笑话，它一点都不觉得好笑。",
+                "什么叫真正的朋友？借钱不还的那种！",
+                "这不是一个笑话，只是一个普通的句子。",
+                "为什么？为什么？问：什么？答：没有。",  # Invalid format
+            ],
+            "invalid_idx": 4,
+        },
+        {
+            "model_id": "KonradBRG/joke-rater-roberta-es",
+            "language": "es",
+            "jokes": [
+                "¿Por qué el libro de matemáticas estaba triste? Porque tenía muchos problemas!",
+                "Le dije a mi esposa que estaba dibujando sus cejas muy altas. Se sorprendió.",
+                "¿Cómo se llama un boomerang que no vuelve? Un palo!",
+                "Esto no es un chiste, solo una oración normal.",
+                "¿Por qué? ¿Por qué otra vez? P: ¿Qué? R: Nada.",  # Invalid format
+            ],
+            "invalid_idx": 4,
+        },
+    ]
 
-        jokes = [
-            "Why did the scarecrow win an award? Because he was outstanding in his field!",
-            "I told my wife she was drawing her eyebrows too high. She looked surprised.",
-            "What do you call a fake noodle? An impasta!",
-            "This is not a joke at all, just a regular sentence.",
-            "Why? Why? Why did this happen? Q: What? A: Nothing.",  # Invalid format
-        ]
+    for config in test_configs:
+        model_id = config["model_id"]
+        lang = config["language"]
+        jokes = config["jokes"]
+        invalid_idx = config["invalid_idx"]
 
-        print("\nScoring jokes...")
-        scores = roberta_fn(jokes)
+        print(f"\n--- Testing {lang.upper()}: {model_id} ---")
 
-        print("\nResults:")
-        for joke, score in zip(jokes, scores):
-            print(f"  Score: {score:.3f} - '{joke[:60]}...'")
+        try:
+            roberta_fn = create_roberta_score_fn(model_id, language=lang)
 
-        # The invalid joke should get 0.0 (filtered out)
-        print(f"\nInvalid joke score: {scores[4]} (expected: 0.0 due to validation)")
-        results.check(scores[4] == 0.0, f"Expected 0.0 for invalid joke, got {scores[4]}", "Invalid joke filtered")
+            print("  Scoring jokes...")
+            scores = roberta_fn(jokes)
 
-        # Valid jokes should have non-zero scores
-        results.check(scores[0] != 0.0, f"Expected non-zero for valid joke, got {scores[0]}", "Valid joke scored")
+            print("  Results:")
+            for joke, score in zip(jokes, scores):
+                display_joke = joke[:50] + "..." if len(joke) > 50 else joke
+                print(f"    Score: {score:.3f} - '{display_joke}'")
 
-        print("\n[DONE] roberta_score tests completed")
+            # The invalid joke should get 0.0 (filtered out)
+            print(f"\n  Invalid joke score: {scores[invalid_idx]} (expected: 0.0)")
+            results.check(
+                scores[invalid_idx] == 0.0,
+                f"Expected 0.0 for invalid joke, got {scores[invalid_idx]}",
+                f"{lang} invalid joke filtered"
+            )
 
-    except Exception as e:
-        print(f"\n[ERROR] Failed to load roberta model: {e}")
-        results.check(False, f"Failed to load roberta model: {e}", "roberta load")
+            # Valid jokes should have non-zero scores
+            results.check(
+                scores[0] != 0.0,
+                f"Expected non-zero for valid joke, got {scores[0]}",
+                f"{lang} valid joke scored"
+            )
+
+            print(f"  [DONE] {lang.upper()} roberta tests completed")
+
+        except Exception as e:
+            print(f"  [ERROR] Failed to load {model_id}: {e}")
+            results.check(False, f"Failed to load {model_id}: {e}", f"{lang} roberta load")
 
 
 def test_with_parquet_data(data_dir: str):
