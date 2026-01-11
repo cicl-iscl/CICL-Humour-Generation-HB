@@ -8,6 +8,7 @@ Usage (single GPU, no accelerate):
 """
 import os
 import torch
+import weave
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM, TrainerCallback
