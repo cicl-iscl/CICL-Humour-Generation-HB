@@ -118,7 +118,8 @@ class GenerationLoggingCallback(TrainerCallback):
         for row in table_data:
             table.add_data(*[row.get(col, None) for col in columns])
 
-        wandb.log({f"generations/step_{state.global_step}": table}, step=state.global_step)
+        # Don't pass step= to avoid conflicts with trainer's internal step counter
+        wandb.log({f"generations/step_{state.global_step}": table})
 
 
 def main():
