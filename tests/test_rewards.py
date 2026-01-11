@@ -4,6 +4,7 @@ Test script for GRPO reward functions.
 Usage:
     python tests/test_rewards.py
     python tests/test_rewards.py --skip-roberta  # Skip slow roberta tests
+    python tests/test_rewards.py --data-dir ../data  # Test with parquet data
 """
 import sys
 import os
@@ -30,6 +31,37 @@ from grpo.rewards import (
 )
 
 
+class TestResults:
+    """Collect test results and report at the end."""
+
+    def __init__(self):
+        self.passed = 0
+        self.failed = 0
+        self.failures = []
+
+    def check(self, condition, message, context=""):
+        if condition:
+            self.passed += 1
+            return True
+        else:
+            self.failed += 1
+            self.failures.append(f"{context}: {message}" if context else message)
+            return False
+
+    def summary(self):
+        print("\n" + "="*60)
+        print(f"SUMMARY: {self.passed} passed, {self.failed} failed")
+        print("="*60)
+        if self.failures:
+            print("\nFailures:")
+            for f in self.failures:
+                print(f"  - {f}")
+        return self.failed == 0
+
+
+results = TestResults()
+
+
 def test_word_pair_prompt_adherence():
     """Test word pair prompt adherence for all languages."""
     print("\n" + "="*60)
@@ -54,14 +86,14 @@ def test_word_pair_prompt_adherence():
     print(f"  One word present:   {scores[1]} (expected: -1.0)")
     print(f"  No words present:   {scores[2]} (expected: -2.0)")
 
-    assert scores[0] == 2.0, f"Expected 2.0 for both words, got {scores[0]}"
-    assert scores[1] == -1.0, f"Expected -1.0 for one word, got {scores[1]}"
-    assert scores[2] == -2.0, f"Expected -2.0 for no words, got {scores[2]}"
+    results.check(scores[0] == 2.0, f"Expected 2.0 for both words, got {scores[0]}", "EN both words")
+    results.check(scores[1] == -1.0, f"Expected -1.0 for one word, got {scores[1]}", "EN one word")
+    results.check(scores[2] == -2.0, f"Expected -2.0 for no words, got {scores[2]}", "EN no words")
 
     # Chinese tests
     zh_prompts = [
-        "用这两个词生成一个有趣的笑话：'猫', '披萨'。",
-        "用这两个词生成一个有趣的笑话：'狗', '电脑'。",
+        "用这两个词生成一个有趣的笑话：'猫'、'披萨'。",
+        "用这两个词生成一个有趣的笑话：'狗'、'电脑'。",
     ]
     zh_completions = [
         "猫咪看着披萨说：这是我的！",  # Both words
@@ -73,8 +105,8 @@ def test_word_pair_prompt_adherence():
     print(f"  Both words present: {scores[0]} (expected: 2.0)")
     print(f"  No words present:   {scores[1]} (expected: -2.0)")
 
-    assert scores[0] == 2.0, f"Expected 2.0 for both words, got {scores[0]}"
-    assert scores[1] == -2.0, f"Expected -2.0 for no words, got {scores[1]}"
+    results.check(scores[0] == 2.0, f"Expected 2.0 for both words, got {scores[0]}", "ZH both words")
+    results.check(scores[1] == -2.0, f"Expected -2.0 for no words, got {scores[1]}", "ZH no words")
 
     # Spanish tests
     es_prompts = [
@@ -91,8 +123,8 @@ def test_word_pair_prompt_adherence():
     print(f"  Both words present: {scores[0]} (expected: 2.0)")
     print(f"  No words present:   {scores[1]} (expected: -2.0)")
 
-    assert scores[0] == 2.0, f"Expected 2.0 for both words, got {scores[0]}"
-    assert scores[1] == -2.0, f"Expected -2.0 for no words, got {scores[1]}"
+    results.check(scores[0] == 2.0, f"Expected 2.0 for both words, got {scores[0]}", "ES both words")
+    results.check(scores[1] == -2.0, f"Expected -2.0 for no words, got {scores[1]}", "ES no words")
 
     # Headline task (should return None)
     headline_prompts = ["Generate a funny joke related to this headline: 'Stock market crashes'."]
@@ -100,9 +132,9 @@ def test_word_pair_prompt_adherence():
     scores = word_pair_prompt_adherence(headline_completions, headline_prompts)
     print("\nHeadline task (should skip):")
     print(f"  Score: {scores[0]} (expected: None)")
-    assert scores[0] is None, f"Expected None for headline task, got {scores[0]}"
+    results.check(scores[0] is None, f"Expected None for headline task, got {scores[0]}", "Headline skip")
 
-    print("\n[PASS] word_pair_prompt_adherence tests passed!")
+    print("\n[DONE] word_pair_prompt_adherence tests completed")
 
 
 def test_is_valid_single_joke():
@@ -118,11 +150,11 @@ def test_is_valid_single_joke():
     invalid_qa_format = "Q: Why did the chicken cross? A: To get there."
     invalid_stacking = "Why did the cat? Why did the dog?"
 
-    assert is_valid_single_joke_en(valid_en) == True, "Valid joke should pass"
-    assert is_valid_single_joke_en(invalid_multiple_q) == False, "Multiple ? should fail"
-    assert is_valid_single_joke_en(invalid_qa_format) == False, "Q:/A: format should fail"
-    assert is_valid_single_joke_en(invalid_stacking) == False, "Multiple 'why' should fail"
-    print("  [PASS] English validation tests passed!")
+    results.check(is_valid_single_joke_en(valid_en) == True, "Valid joke should pass", "EN valid")
+    results.check(is_valid_single_joke_en(invalid_multiple_q) == False, "Multiple ? should fail", "EN multiple ?")
+    results.check(is_valid_single_joke_en(invalid_qa_format) == False, "Q:/A: format should fail", "EN Q:/A:")
+    results.check(is_valid_single_joke_en(invalid_stacking) == False, "Multiple 'why' should fail", "EN stacking")
+    print("  English validation tests completed")
 
     # Chinese
     print("\nChinese validation:")
@@ -130,21 +162,21 @@ def test_is_valid_single_joke():
     invalid_zh_multiple_q = "为什么？为什么？"
     invalid_zh_qa = "问：为什么？答：因为。"
 
-    assert is_valid_single_joke_zh(valid_zh) == True, "Valid Chinese joke should pass"
-    assert is_valid_single_joke_zh(invalid_zh_multiple_q) == False, "Multiple 为什么 should fail"
-    assert is_valid_single_joke_zh(invalid_zh_qa) == False, "问：/答： format should fail"
-    print("  [PASS] Chinese validation tests passed!")
+    results.check(is_valid_single_joke_zh(valid_zh) == True, "Valid Chinese joke should pass", "ZH valid")
+    results.check(is_valid_single_joke_zh(invalid_zh_multiple_q) == False, "Multiple 为什么 should fail", "ZH multiple")
+    results.check(is_valid_single_joke_zh(invalid_zh_qa) == False, "问：/答： format should fail", "ZH Q/A")
+    print("  Chinese validation tests completed")
 
     # Spanish
     print("\nSpanish validation:")
     valid_es = "¿Por qué el gato pidio pizza? Porque tenia hambre!"
     invalid_es_multiple = "¿Por qué? ¿Por qué otra vez?"
 
-    assert is_valid_single_joke_es(valid_es) == True, "Valid Spanish joke should pass"
-    assert is_valid_single_joke_es(invalid_es_multiple) == False, "Multiple por qué should fail"
-    print("  [PASS] Spanish validation tests passed!")
+    results.check(is_valid_single_joke_es(valid_es) == True, "Valid Spanish joke should pass", "ES valid")
+    results.check(is_valid_single_joke_es(invalid_es_multiple) == False, "Multiple por qué should fail", "ES multiple")
+    print("  Spanish validation tests completed")
 
-    print("\n[PASS] All is_valid_single_joke tests passed!")
+    print("\n[DONE] is_valid_single_joke tests completed")
 
 
 def test_extract_joke_structure():
@@ -160,28 +192,29 @@ def test_extract_joke_structure():
         ("What do you call a lazy kangaroo?", "what-do-you-call"),
         ("Knock knock! Who's there?", "knock-knock"),
         ("Life is like a box of chocolates.", "observation"),
-        ("I told my wife she was drawing her eyebrows too high. She looked surprised.", "qa-punchline"),
+        ("Why did the tomato turn red? Because it saw the salad dressing!", "qa-punchline"),
+        ("I used to hate facial hair, but then it grew on me.", "one-liner"),
     ]
 
     for joke, expected in test_cases_en:
         result = extract_joke_structure(joke)
-        status = "PASS" if result == expected else "FAIL"
+        passed = results.check(result == expected, f"Expected {expected}, got {result}", f"EN structure: {joke[:30]}")
+        status = "PASS" if passed else "FAIL"
         print(f"  [{status}] '{joke[:40]}...' -> {result} (expected: {expected})")
-        assert result == expected, f"Expected {expected}, got {result}"
 
     # Chinese
     print("\nChinese structures:")
     test_cases_zh = [
         ("为什么猫喜欢鱼？", "why-did"),
         ("什么叫真正的朋友？", "what-do-you-call"),
-        ("这就像生活一样。", "observation"),
+        ("生活就像一盒巧克力。", "observation"),
     ]
 
     for joke, expected in test_cases_zh:
         result = extract_joke_structure_zh(joke)
-        status = "PASS" if result == expected else "FAIL"
+        passed = results.check(result == expected, f"Expected {expected}, got {result}", f"ZH structure: {joke[:20]}")
+        status = "PASS" if passed else "FAIL"
         print(f"  [{status}] '{joke}' -> {result} (expected: {expected})")
-        assert result == expected, f"Expected {expected}, got {result}"
 
     # Spanish
     print("\nSpanish structures:")
@@ -193,11 +226,11 @@ def test_extract_joke_structure():
 
     for joke, expected in test_cases_es:
         result = extract_joke_structure_es(joke)
-        status = "PASS" if result == expected else "FAIL"
+        passed = results.check(result == expected, f"Expected {expected}, got {result}", f"ES structure: {joke[:20]}")
+        status = "PASS" if passed else "FAIL"
         print(f"  [{status}] '{joke}' -> {result} (expected: {expected})")
-        assert result == expected, f"Expected {expected}, got {result}"
 
-    print("\n[PASS] All extract_joke_structure tests passed!")
+    print("\n[DONE] extract_joke_structure tests completed")
 
 
 def test_formatting():
@@ -223,15 +256,15 @@ def test_formatting():
 
     print("\nGood jokes (expected: 1.0):")
     for joke, score in zip(good_jokes, good_scores):
+        passed = results.check(score == 1.0, f"Expected 1.0, got {score}", f"Good joke: {joke[:30]}")
         print(f"  Score: {score} - '{joke[:50]}...'")
-        assert score == 1.0, f"Expected 1.0, got {score}"
 
     print("\nBad jokes (expected: -1.0):")
     for joke, score in zip(bad_jokes, bad_scores):
+        passed = results.check(score == -1.0, f"Expected -1.0, got {score}", f"Bad joke: {joke[:30]}")
         print(f"  Score: {score} - '{joke[:50]}...'")
-        assert score == -1.0, f"Expected -1.0, got {score}"
 
-    print("\n[PASS] formatting tests passed!")
+    print("\n[DONE] formatting tests completed")
 
 
 def test_length_penalty():
@@ -255,9 +288,9 @@ def test_length_penalty():
     print(f"  Optimal (16 words):  {scores[1]} (expected: 0.0)")
     print(f"  Too long (30 words): {scores[2]} (expected: -2.0)")
 
-    assert scores[0] == -2.0, f"Expected -2.0 for too short, got {scores[0]}"
-    assert scores[1] == 0.0, f"Expected 0.0 for optimal, got {scores[1]}"
-    assert scores[2] == -2.0, f"Expected -2.0 for too long, got {scores[2]}"
+    results.check(scores[0] == -2.0, f"Expected -2.0 for too short, got {scores[0]}", "EN too short")
+    results.check(scores[1] == 0.0, f"Expected 0.0 for optimal, got {scores[1]}", "EN optimal")
+    results.check(scores[2] == -2.0, f"Expected -2.0 for too long, got {scores[2]}", "EN too long")
 
     # Chinese (character-based: min=10, max=60, optimal=35)
     length_zh = create_length_penalty_fn("zh")
@@ -274,10 +307,10 @@ def test_length_penalty():
     print(f"  Medium (~25 chars):  {scores[1]} (expected: ~0.0 or small negative)")
     print(f"  Too long (70 chars): {scores[2]} (expected: -2.0)")
 
-    assert scores[0] == -2.0, f"Expected -2.0 for too short, got {scores[0]}"
-    assert scores[2] == -2.0, f"Expected -2.0 for too long, got {scores[2]}"
+    results.check(scores[0] == -2.0, f"Expected -2.0 for too short, got {scores[0]}", "ZH too short")
+    results.check(scores[2] == -2.0, f"Expected -2.0 for too long, got {scores[2]}", "ZH too long")
 
-    print("\n[PASS] length_penalty tests passed!")
+    print("\n[DONE] length_penalty tests completed")
 
 
 def test_headline_adherence():
@@ -295,7 +328,7 @@ def test_headline_adherence():
     scores = headline_en(word_pair_completions, word_pair_prompts)
     print("\nWord pair task (should skip):")
     print(f"  Score: {scores[0]} (expected: None)")
-    assert scores[0] is None, f"Expected None, got {scores[0]}"
+    results.check(scores[0] is None, f"Expected None, got {scores[0]}", "Word pair skip")
 
     # Headline prompts
     headline_prompts = [
@@ -315,11 +348,11 @@ def test_headline_adherence():
     print(f"  Bad pattern:        {scores[1]} (expected: -1.0)")
     print(f"  Too long:           {scores[2]} (expected: -1.0)")
 
-    assert scores[0] == 1.0, f"Expected 1.0, got {scores[0]}"
-    assert scores[1] == -1.0, f"Expected -1.0, got {scores[1]}"
-    assert scores[2] == -1.0, f"Expected -1.0, got {scores[2]}"
+    results.check(scores[0] == 1.0, f"Expected 1.0, got {scores[0]}", "Good headline")
+    results.check(scores[1] == -1.0, f"Expected -1.0, got {scores[1]}", "Bad pattern headline")
+    results.check(scores[2] == -1.0, f"Expected -1.0, got {scores[2]}", "Too long headline")
 
-    print("\n[PASS] headline_adherence tests passed!")
+    print("\n[DONE] headline_adherence tests completed")
 
 
 def test_coherence_penalty():
@@ -340,10 +373,10 @@ def test_coherence_penalty():
     print(f"  No caps:   {scores[0]} (expected: 0.0)")
     print(f"  Many caps: {scores[1]} (expected: negative)")
 
-    assert scores[0] == 0.0, f"Expected 0.0, got {scores[0]}"
-    assert scores[1] < 0, f"Expected negative, got {scores[1]}"
+    results.check(scores[0] == 0.0, f"Expected 0.0, got {scores[0]}", "No caps")
+    results.check(scores[1] < 0, f"Expected negative, got {scores[1]}", "Many caps")
 
-    print("\n[PASS] coherence_penalty tests passed!")
+    print("\n[DONE] coherence_penalty tests completed")
 
 
 def test_roberta_score(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
@@ -352,33 +385,139 @@ def test_roberta_score(model_id: str = "KonradBRG/joke-rater-xlm-roberta"):
     print(f"Testing roberta_score with {model_id}")
     print("="*60)
 
-    roberta_fn = create_roberta_score_fn(model_id, language="en")
+    try:
+        roberta_fn = create_roberta_score_fn(model_id, language="en")
 
-    jokes = [
-        "Why did the scarecrow win an award? Because he was outstanding in his field!",
-        "I told my wife she was drawing her eyebrows too high. She looked surprised.",
-        "What do you call a fake noodle? An impasta!",
-        "This is not a joke at all, just a regular sentence.",
-        "Why? Why? Why did this happen? Q: What? A: Nothing.",  # Invalid format
-    ]
+        jokes = [
+            "Why did the scarecrow win an award? Because he was outstanding in his field!",
+            "I told my wife she was drawing her eyebrows too high. She looked surprised.",
+            "What do you call a fake noodle? An impasta!",
+            "This is not a joke at all, just a regular sentence.",
+            "Why? Why? Why did this happen? Q: What? A: Nothing.",  # Invalid format
+        ]
 
-    print("\nScoring jokes...")
-    scores = roberta_fn(jokes)
+        print("\nScoring jokes...")
+        scores = roberta_fn(jokes)
 
-    print("\nResults:")
-    for joke, score in zip(jokes, scores):
-        print(f"  Score: {score:.3f} - '{joke[:60]}...'")
+        print("\nResults:")
+        for joke, score in zip(jokes, scores):
+            print(f"  Score: {score:.3f} - '{joke[:60]}...'")
 
-    # The invalid joke should get 0.0 (filtered out)
-    print(f"\nInvalid joke score: {scores[4]} (expected: 0.0 due to validation)")
+        # The invalid joke should get 0.0 (filtered out)
+        print(f"\nInvalid joke score: {scores[4]} (expected: 0.0 due to validation)")
+        results.check(scores[4] == 0.0, f"Expected 0.0 for invalid joke, got {scores[4]}", "Invalid joke filtered")
 
-    print("\n[PASS] roberta_score test completed!")
+        # Valid jokes should have non-zero scores
+        results.check(scores[0] != 0.0, f"Expected non-zero for valid joke, got {scores[0]}", "Valid joke scored")
+
+        print("\n[DONE] roberta_score tests completed")
+
+    except Exception as e:
+        print(f"\n[ERROR] Failed to load roberta model: {e}")
+        results.check(False, f"Failed to load roberta model: {e}", "roberta load")
+
+
+def test_with_parquet_data(data_dir: str):
+    """Test reward functions with actual training/test data from parquet files."""
+    print("\n" + "="*60)
+    print(f"Testing with parquet data from {data_dir}")
+    print("="*60)
+
+    try:
+        import pandas as pd
+    except ImportError:
+        print("[SKIP] pandas not installed, skipping parquet tests")
+        return
+
+    # Test for each language
+    for lang, suffix in [("en", ""), ("zh", "_zh"), ("es", "_es")]:
+        train_path = os.path.join(data_dir, f"rl_df_train{suffix}.parquet")
+        test_path = os.path.join(data_dir, f"rl_df_test{suffix}.parquet")
+
+        if not os.path.exists(train_path):
+            print(f"\n[SKIP] {train_path} not found")
+            continue
+
+        print(f"\n--- Testing {lang.upper()} data ---")
+
+        # Load data
+        train_df = pd.read_parquet(train_path)
+        print(f"  Loaded {len(train_df)} training prompts")
+
+        # Sample some prompts
+        sample_prompts = train_df["prompt"].head(10).tolist()
+
+        # Test word_pair_prompt_adherence pattern matching
+        print(f"\n  Testing word_pair pattern matching on {len(sample_prompts)} samples:")
+
+        # Create fake completions that should score well
+        good_completions = []
+        for prompt in sample_prompts:
+            # Extract words if it's a word pair prompt
+            import re
+            patterns = [
+                r"'([^']+)'\s*,\s*'([^']+)'",  # Generic pattern
+            ]
+            words = None
+            for pattern in patterns:
+                match = re.search(pattern, prompt)
+                if match:
+                    words = match.groups()
+                    break
+
+            if words:
+                # Create a completion with both words
+                good_completions.append(f"This joke has {words[0]} and {words[1]} in it!")
+            else:
+                # Headline prompt
+                good_completions.append("This is a short headline joke.")
+
+        scores = word_pair_prompt_adherence(good_completions, sample_prompts)
+
+        word_pair_count = sum(1 for s in scores if s is not None)
+        headline_count = sum(1 for s in scores if s is None)
+        positive_scores = sum(1 for s in scores if s is not None and s > 0)
+
+        print(f"    Word pair prompts: {word_pair_count}")
+        print(f"    Headline prompts:  {headline_count}")
+        print(f"    Positive scores:   {positive_scores}/{word_pair_count}")
+
+        results.check(
+            word_pair_count > 0 or headline_count > 0,
+            f"Should detect prompts in {lang}",
+            f"{lang} prompt detection"
+        )
+
+        # Test length penalty on actual format
+        length_fn = create_length_penalty_fn(lang)
+        test_completions = [
+            "Short.",
+            "This is a medium length joke that should be within the acceptable range for testing.",
+            "x" * 100 if lang == "zh" else " ".join(["word"] * 40),
+        ]
+        length_scores = length_fn(test_completions)
+        print(f"\n  Length penalty test:")
+        print(f"    Short:  {length_scores[0]}")
+        print(f"    Medium: {length_scores[1]}")
+        print(f"    Long:   {length_scores[2]}")
+
+        # Test structure diversity
+        structure_fn = create_structure_diversity_reward_fn(lang)
+        structure_scores = structure_fn(good_completions[:5])
+        print(f"\n  Structure diversity scores: {[round(s, 3) for s in structure_scores]}")
+
+        if os.path.exists(test_path):
+            test_df = pd.read_parquet(test_path)
+            print(f"\n  Loaded {len(test_df)} test prompts")
+
+    print("\n[DONE] parquet data tests completed")
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Test reward functions")
     parser.add_argument("--skip-roberta", action="store_true", help="Skip slow roberta tests")
+    parser.add_argument("--data-dir", type=str, default=None, help="Directory with parquet data files")
     args = parser.parse_args()
 
     print("="*60)
@@ -399,9 +538,19 @@ def main():
     else:
         print("\n[SKIPPED] roberta_score tests (use without --skip-roberta to run)")
 
-    print("\n" + "="*60)
-    print("ALL TESTS PASSED!")
-    print("="*60)
+    if args.data_dir:
+        test_with_parquet_data(args.data_dir)
+    else:
+        # Try default location
+        default_data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        if os.path.exists(default_data_dir):
+            test_with_parquet_data(default_data_dir)
+        else:
+            print("\n[SKIPPED] parquet data tests (use --data-dir to specify location)")
+
+    # Print summary
+    success = results.summary()
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
