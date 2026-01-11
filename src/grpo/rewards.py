@@ -3,7 +3,7 @@ import emoji
 import re
 from collections import deque
 import torch
-from transformers import pipeline, AutoModelForSequenceClassification, XLMRobertaTokenizer, AutoConfig
+from transformers import pipeline, XLMRobertaForSequenceClassification, AutoModelForSequenceClassification, XLMRobertaTokenizer, AutoConfig
 
 
 def is_valid_single_joke_en(text):
@@ -59,6 +59,12 @@ is_valid_single_joke = is_valid_single_joke_en
 
 
 recent_structures = deque(maxlen=30)
+
+
+def reset_recent_structures():
+    """Reset the global recent_structures deque. Useful for testing."""
+    global recent_structures
+    recent_structures.clear()
 
 
 def extract_joke_structure(joke: str) -> str:

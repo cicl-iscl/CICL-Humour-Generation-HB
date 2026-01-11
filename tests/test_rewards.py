@@ -28,6 +28,8 @@ from grpo.rewards import (
     create_coherence_penalty_fn,
     create_structure_diversity_reward_fn,
     create_roberta_score_fn,
+    # Utils
+    reset_recent_structures,
 )
 
 
@@ -429,6 +431,22 @@ def test_with_parquet_data(data_dir: str):
         print("[SKIP] pandas not installed, skipping parquet tests")
         return
 
+    # Language-specific completion templates
+    completion_templates = {
+        "en": {
+            "word_pair": "Why did the {0} meet the {1}? Because they wanted to be friends!",
+            "headline": "This is a short headline joke.",
+        },
+        "zh": {
+            "word_pair": "为什么{0}遇到了{1}？因为它们想成为朋友！",
+            "headline": "这是一个简短的标题笑话。",
+        },
+        "es": {
+            "word_pair": "¿Por qué el {0} conoció al {1}? Porque querían ser amigos!",
+            "headline": "Este es un chiste corto sobre el titular.",
+        },
+    }
+
     # Test for each language
     for lang, suffix in [("en", ""), ("zh", "_zh"), ("es", "_es")]:
         train_path = os.path.join(data_dir, f"rl_df_train{suffix}.parquet")
@@ -440,6 +458,9 @@ def test_with_parquet_data(data_dir: str):
 
         print(f"\n--- Testing {lang.upper()} data ---")
 
+        # Reset structure history before testing each language
+        reset_recent_structures()
+
         # Load data
         train_df = pd.read_parquet(train_path)
         print(f"  Loaded {len(train_df)} training prompts")
@@ -450,13 +471,14 @@ def test_with_parquet_data(data_dir: str):
         # Test word_pair_prompt_adherence pattern matching
         print(f"\n  Testing word_pair pattern matching on {len(sample_prompts)} samples:")
 
-        # Create fake completions that should score well
+        # Create fake completions in the target language
+        templates = completion_templates[lang]
         good_completions = []
         for prompt in sample_prompts:
             # Extract words if it's a word pair prompt
             import re
             patterns = [
-                r"'([^']+)'\s*,\s*'([^']+)'",  # Generic pattern
+                r"'([^']+)'[、,]\s*'([^']+)'",  # Matches both , and 、
             ]
             words = None
             for pattern in patterns:
@@ -466,11 +488,11 @@ def test_with_parquet_data(data_dir: str):
                     break
 
             if words:
-                # Create a completion with both words
-                good_completions.append(f"This joke has {words[0]} and {words[1]} in it!")
+                # Create a completion with both words in target language
+                good_completions.append(templates["word_pair"].format(words[0], words[1]))
             else:
                 # Headline prompt
-                good_completions.append("This is a short headline joke.")
+                good_completions.append(templates["headline"])
 
         scores = word_pair_prompt_adherence(good_completions, sample_prompts)
 
@@ -490,21 +512,37 @@ def test_with_parquet_data(data_dir: str):
 
         # Test length penalty on actual format
         length_fn = create_length_penalty_fn(lang)
-        test_completions = [
-            "Short.",
-            "This is a medium length joke that should be within the acceptable range for testing.",
-            "x" * 100 if lang == "zh" else " ".join(["word"] * 40),
-        ]
+        if lang == "zh":
+            test_completions = [
+                "短",  # Too short
+                "这是一个中等长度的笑话，用来测试长度惩罚功能。",  # Medium (~20 chars)
+                "这" * 100,  # Too long
+            ]
+        else:
+            test_completions = [
+                "Short.",
+                "This is a medium length joke that should be within the acceptable range for testing.",
+                " ".join(["word"] * 40),
+            ]
         length_scores = length_fn(test_completions)
         print(f"\n  Length penalty test:")
         print(f"    Short:  {length_scores[0]}")
         print(f"    Medium: {length_scores[1]}")
         print(f"    Long:   {length_scores[2]}")
 
-        # Test structure diversity
+        # Test structure diversity with language-appropriate completions
+        reset_recent_structures()  # Reset again for clean diversity test
         structure_fn = create_structure_diversity_reward_fn(lang)
         structure_scores = structure_fn(good_completions[:5])
         print(f"\n  Structure diversity scores: {[round(s, 3) for s in structure_scores]}")
+
+        # Verify first score is positive (novel structure)
+        if structure_scores:
+            results.check(
+                structure_scores[0] > 0,
+                f"First structure should be novel in {lang}",
+                f"{lang} structure diversity"
+            )
 
         if os.path.exists(test_path):
             test_df = pd.read_parquet(test_path)
