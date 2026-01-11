@@ -85,23 +85,25 @@ def setup_model_config(model, train_df, binary_weights, child_weights):
     Update the model's configuration with custom attributes needed for inference.
     This sets up id2label, label2id, and auto_map for trust_remote_code loading.
     """
-    n_labels = len(train_df.labels.unique())  # Should be 11 (0-10)
+    # Always use 11 labels (0-10) regardless of training data distribution
+    # The HierarchicalClassifier architecture always outputs 11 classes
+    n_labels = 11
 
     # Convert config to HierarchicalConfig if needed
     current_config_dict = model.config.to_dict()
     model.config = HierarchicalConfig(**current_config_dict)
 
-    model.config.num_child_labels = n_labels - 1  # 10
+    model.config.num_child_labels = 10  # Child head: labels 1-10
     model.config.class_weights_binary = binary_weights
     model.config.class_weights_child = child_weights
 
-    # Set up label mappings - labels are 0-10, indices are 0-10
-    unique_labels = sorted(train_df["labels"].unique())  # [0, 1, ..., 10]
-    id2label = {int(i): int(label) for i, label in enumerate(unique_labels)}
-    label2id = {v: k for k, v in id2label.items()}
+    # Set up label mappings - always identity mapping 0-10
+    # This ensures consistent output format across all language models
+    id2label = {i: i for i in range(n_labels)}
+    label2id = {i: i for i in range(n_labels)}
     model.config.id2label = id2label
     model.config.label2id = label2id
-    model.config.num_labels = n_labels  # 11
+    model.config.num_labels = n_labels
 
     # Add auto_map for custom class serialization with trust_remote_code
     model.config.auto_map = {
@@ -109,7 +111,13 @@ def setup_model_config(model, train_df, binary_weights, child_weights):
         "AutoModelForSequenceClassification": "modeling_custom.HierarchicalClassifier",
     }
 
-    print(f"Configured model with {n_labels} labels")
+    # Warn if training data doesn't have all labels
+    unique_labels = sorted(train_df["labels"].unique())
+    if len(unique_labels) < n_labels:
+        missing = set(range(n_labels)) - set(unique_labels)
+        print(f"WARNING: Training data missing labels: {missing}")
+
+    print(f"Configured model with {n_labels} labels (0-10)")
     print(f"id2label: {id2label}")
 
     return model
@@ -188,12 +196,16 @@ if __name__ == "__main__":
 
     # Calculate Class Weights
     binary_weights, child_weights = get_cross_entropy_weights(train_ds)
-    n_labels = len(train_df.labels.unique())
+
+    # Always use 11 labels (0-10) - the architecture must be consistent
+    # Binary head: 2 classes (0 vs non-zero)
+    # Child head: 10 classes (ratings 1-10)
+    NUM_CHILD_LABELS = 10
 
     # Initialize Custom Model
     model = HierarchicalClassifier.from_pretrained(
         MODEL_NAME,
-        num_child_labels=n_labels - 1,
+        num_child_labels=NUM_CHILD_LABELS,
         class_weights_binary=binary_weights,
         class_weights_child=child_weights,
     )
