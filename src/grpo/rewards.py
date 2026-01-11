@@ -253,9 +253,6 @@ def create_roberta_score_fn(model_id: str = "KonradBRG/joke-rater-xlm-roberta", 
         if valid_completions:
             # Get scores for valid jokes
             roberta_labels = scoring_pipe(valid_completions)
-            # Debug: print first result to see format
-            if roberta_labels:
-                print(f"  [DEBUG] Pipeline output sample: {roberta_labels[0]}")
             for idx, roberta_label in zip(valid_indices, roberta_labels):
                 score = float(roberta_label["label"])
                 final_scores[idx] = score
