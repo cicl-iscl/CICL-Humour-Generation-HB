@@ -377,6 +377,15 @@ def contains_emoji_func(text):
     return any(char in emoji.EMOJI_DATA for char in text)
 
 
+def contains_forbidden_symbols(text):
+    """Check for forbidden symbols: #, @, emojis."""
+    if "#" in text or "@" in text:
+        return True
+    if contains_emoji_func(text):
+        return True
+    return False
+
+
 def create_formatting_fn(language: str = "en"):
     """
     Factory function that creates a formatting reward function for a specific language.
@@ -385,33 +394,83 @@ def create_formatting_fn(language: str = "en"):
 
     # Language-specific bad patterns
     bad_patterns_by_lang = {
-        "en": ["How about: ", "This joke", "Let me know", "Note: ", "Here's"],
-        "zh": ["这个笑话", "怎么样", "注意：", "提示：", "让我", "好的，"],
-        "es": ["Qué tal: ", "Este chiste", "Avísame", "Nota: ", "Aquí tienes"],
+        "en": [
+            "How about: ",
+            "This joke",
+            "Let me know",
+            "Note: ",
+            "Here's",
+            "Here's a joke for you:",
+            "Sure!",
+            "You're welcome!",
+            "That joke",
+        ],
+        "zh": [
+            # original ZH
+            "这个笑话",
+            "怎么样",
+            "注意：",
+            "提示：",
+            "让我",
+            "好的，",
+            # translated EN
+            "怎么样：",
+            "这个笑话",
+            "告诉我",
+            "注意：",
+            "这是",
+            "这是一个笑话：",
+            "当然！",
+            "不客气！",
+            "那个笑话",
+        ],
+        "es": [
+            # original ES
+            "Qué tal: ",
+            "Este chiste",
+            "Avísame",
+            "Nota: ",
+            "Aquí tienes",
+            # translated EN
+            "Qué tal: ",
+            "Este chiste",
+            "Avísame",
+            "Nota: ",
+            "Aquí está",
+            "Aquí tienes un chiste:",
+            "¡Claro!",
+            "¡De nada!",
+            "Ese chiste",
+        ],
     }
+
     bad_patterns = bad_patterns_by_lang.get(language, bad_patterns_by_lang["en"])
 
     def formatting(completions, **kwargs):
         """Validates output formatting and penalizes hacking patterns (cell 9)."""
         scores = []
         for completion in completions:
-            is_penalized = False
-            # Penalties for conversational artifacts/bad symbols
+            # Heavy penalty for forbidden symbols (emojis, #, @)
+            # These should NEVER appear in generated jokes
+            if contains_forbidden_symbols(completion):
+                scores.append(-5.0)
+                continue
+
+            # Medium penalty for conversational artifacts/bad patterns
             if (
-                "#" in completion
-                or any(pattern in completion for pattern in bad_patterns)
+                any(pattern in completion for pattern in bad_patterns)
                 or "   " in completion  # Multiple spaces
-                or contains_emoji_func(completion)
             ):
                 scores.append(-1.0)
-                is_penalized = True
-            # Penalty for joke stacking/invalid structure
-            elif not validator(completion):
-                scores.append(-1.0)
-                is_penalized = True
+                continue
 
-            if not is_penalized:
-                scores.append(1.0)
+            # Penalty for joke stacking/invalid structure
+            if not validator(completion):
+                scores.append(-1.0)
+                continue
+
+            # Good formatting
+            scores.append(1.0)
 
         return scores
 
