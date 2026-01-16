@@ -14,8 +14,9 @@ import random
 from datasets import Dataset, load_dataset
 import os
 
-# Common nouns for random word pair generation (English)
+# English words for random word pair generation
 ENGLISH_NOUNS = [
+    # ----- original list -----
     "cat", "dog", "house", "car", "tree", "phone", "book", "chair", "table", "computer",
     "coffee", "pizza", "banana", "apple", "orange", "water", "fire", "ice", "sun", "moon",
     "star", "cloud", "rain", "snow", "wind", "mountain", "river", "ocean", "beach", "forest",
@@ -30,29 +31,89 @@ ENGLISH_NOUNS = [
     "pencil", "eraser", "scissors", "stapler", "notebook", "envelope", "stamp", "calendar", "map",
     "guitar", "piano", "drum", "violin", "trumpet", "flute", "saxophone", "microphone", "speaker",
     "soccer", "basketball", "tennis", "golf", "baseball", "hockey", "swimming", "skiing", "surfing",
-    "airplane", "helicopter", "submarine", "rocket", "spaceship", "bicycle", "motorcycle", "boat", "train"
+    "airplane", "helicopter", "submarine", "rocket", "spaceship", "bicycle", "motorcycle", "boat", "train",
+    # ----- new nouns added: in test file-----
+    "flower", "pumpkin", "laptop", "fridge", "pepper", "clothe", "hair", "towel", "corn", "tomato",
+    # ----- new nouns added: others-----
+    "tea", "sugar", "salt", "rice", "pasta", "beef", "sandwich", "potato", "lettuce", "mushroom", 
+    "wrench", "saw", "axe", "desk", "flashlight", "door", "window", "curtain", "bookshelf", 
+    "sofa", "couch", "mattress", "pillow", "blanket", "carpet", "rug", "cabinet", "wardrobe",
+    "smartphone", "tablet", "monitor", "printer", "scanner", "radio", 
+    "plate", "bowl", "cup", "bottle", "glass", "knife", "fork", "spoon",
 ]
 
-# Chinese nouns for random word pair generation
+ENGLISH_VERBS = [
+    # ----- verbs added: in test file-----
+    "hammer", "drill", "spray", "deseed", "roll", "wash", "shake", "measure", "cut", "blend", "move", 
+    # ----- verbs added: others-----
+    "run", "walk", "jump", "sit", "stand", "lie","sleep", "eat", "drink", "cook", "bake", "boil", 
+    "fry", "grill", "stir", "mix", "slice", "peel", "chop", "grind", "pour", "serve", "clean",
+    "dry", "fold", "iron", "sew", "knit", "paint", "draw", "write", "read", "type", "click", "scroll", 
+    "search", "call", "text", "email", "talk","speak", "listen", "hear", "see", "watch", "look", 
+    "smell", "feel", "touch", "saw", "carve", "sand", "polish", "tighten", "loosen",
+    "assemble", "disassemble", "build", "repair", "fix", "climb", "dig", "plant", "water", "mow", 
+    "sweep", "vacuum", "mop", "dust", "shop","buy", "sell", "pay", "order", "drive", "ride", "park",
+    "fly", "sail", "fish", "hunt", "jog", "sprint", "crawl", "slide", "hop", "skip",
+    "kneel", "stretch", "steam", "roast", "mash", "whisk", "taste", "shave", "brush", "wear",
+    "put", "take", "tie", "zip", "button", "dress", "undress", "like", "love", "prefer", "think", "know",
+    "decorate", "arrange", "carry", "lift", "push", "pull", "swing", "spin", "screw", "unscrew", 
+    "nail", "plane", "adjust", "install", "upload", "share", "travel", "get", "have", "make", "need", "want",
+    "uninstall", "press", "sketch", "photograph", "record", "play", "view", "download",
+    "understand", "remember", "forget", "help", "give", "show", "open", "close", "start", "finish",
+]
+
+
+# Chinese words for random word pair generation
 CHINESE_NOUNS = [
-    "猫", "狗", "房子", "汽车", "树", "手机", "书", "椅子", "桌子", "电脑",
+    "猫", "狗", "房子", "汽车", "树", "电话", "书", "椅子", "桌子", "电脑",
     "咖啡", "披萨", "香蕉", "苹果", "橙子", "水", "火", "冰", "太阳", "月亮",
-    "星星", "云", "雨", "雪", "风", "山", "河", "海", "沙滩", "森林",
+    "星星", "云", "雨", "雪", "风", "山", "河", "海洋", "海滩", "森林",
     "鸟", "鱼", "马", "牛", "猪", "鸡", "鸭", "兔子", "老鼠", "大象",
     "狮子", "老虎", "熊", "猴子", "蛇", "青蛙", "蝴蝶", "蜘蛛", "蚂蚁", "蜜蜂",
     "医生", "老师", "律师", "厨师", "飞行员", "护士", "艺术家", "音乐家", "作家", "工程师",
-    "机器人", "外星人", "僵尸", "吸血鬼", "鬼", "魔法师", "忍者", "海盗", "骑士", "龙",
-    "锤子", "螺丝刀", "梯子", "桶", "绳子", "钉子", "刷子", "镜子", "钟", "灯",
+    "机器人", "外星人", "僵尸", "吸血鬼", "鬼", "巫师", "忍者", "海盗", "骑士", "龙",
+    "锤子", "螺丝刀", "梯子", "桶", "绳子", "钉子", "刷子", "镜子", "时钟", "台灯",
     "衬衫", "裤子", "鞋子", "帽子", "眼镜", "手表", "戒指", "项链", "雨伞", "包",
     "蛋糕", "饼干", "面包", "奶酪", "黄油", "牛奶", "鸡蛋", "培根", "沙拉", "汤",
     "微波炉", "冰箱", "电视", "键盘", "耳机", "相机", "电池", "充电器",
     "铅笔", "橡皮", "剪刀", "订书机", "笔记本", "信封", "邮票", "日历", "地图",
-    "吉他", "钢琴", "鼓", "小提琴", "小号", "长笛", "萨克斯", "麦克风", "扬声器",
+    "吉他", "钢琴", "鼓", "小提琴", "小号", "长笛", "萨克斯管", "麦克风", "扬声器",
     "足球", "篮球", "网球", "高尔夫", "棒球", "曲棍球", "游泳", "滑雪", "冲浪",
-    "飞机", "直升机", "潜水艇", "火箭", "宇宙飞船", "自行车", "摩托车", "船", "火车"
+    "飞机", "直升机", "潜艇", "火箭", "宇宙飞船", "自行车", "摩托车", "船", "火车",
+    # ----- new nouns added: in test file -----
+    "花", "南瓜", "笔记本电脑", "冰箱", "胡椒", "衣物", "头发", "毛巾", "玉米", "番茄",
+    # ----- new nouns added: others -----
+    "茶", "糖", "盐", "米", "意大利面", "牛肉", "三明治", "土豆", "生菜", "蘑菇",
+    "扳手", "锯子", "斧头", "书桌", "手电筒", "门", "窗户", "窗帘", "书架",
+    "沙发", "长沙发", "床垫", "枕头", "毛毯", "地毯", "小地毯", "橱柜", "衣柜",
+    "智能手机", "平板电脑", "显示器", "打印机", "扫描仪", "收音机",
+    "盘子", "碗", "杯子", "瓶子", "玻璃杯", "刀", "叉子", "勺子"
 ]
 
-# Spanish nouns for random word pair generation
+
+CHINESE_VERBS = [
+    # ----- verbs added: in test file-----
+    "锤击", "敲击","喷", "喷洒", "去籽", "滚动", "洗","冲洗", "洗涤", "摇", "摇晃", "测量", 
+    "切", "切割","混合", "移动", "钻", "钻井", 
+    # ----- verbs added: others-----
+    "跑", "走", "跳", "坐", "站", "躺", "睡觉", "吃", "喝", "做饭", "烘烤", "沸腾", 
+    "炸", "烧烤", "搅拌", "混合", "切片", "剥皮", "剁碎", "磨碎", "倒", "上菜",
+    "打扫", "擦干", "折叠", "熨烫", "缝纫", "编织", "涂漆", "画", "写", "读", "打字",
+    "点击", "滚动", "搜索", "打电话", "发短信", "发邮件", "谈话", "说话", "听", "看见", "观看",
+    "看", "嗅闻", "感觉", "触摸", "锯", "雕刻", "打磨", "抛光", "收紧", "松开",
+    "组装", "拆卸", "建造", "修理", "修复", "爬", "挖", "种植", "浇水", "割草",
+    "扫", "吸尘", "拖地", "除尘", "购物", "买", "卖", "付钱", "点餐", "开车", "骑", "停车",
+    "飞", "航行", "钓鱼", "狩猎", "慢跑", "冲刺", "爬行", "滑动", "单脚跳", "跳绳",
+    "跪下", "伸展", "蒸", "烤", "捣碎", "打发", "品尝", "刮胡子", "刷", "穿",
+    "放", "拿", "系", "拉链", "扣", "打扮", "脱衣", "喜欢", "爱", "偏好", "思考", "知道",
+    "装饰", "安排", "搬运", "举起", "推", "拉", "摆动", "旋转", "拧螺丝", "松开螺丝",
+    "钉", "刨", "调整", "安装", "上传", "分享", "旅行", "得到", "有", "做", "需要", "想要",
+    "卸载", "按压", "素描", "拍照", "录音", "玩", "查看", "下载",
+    "理解", "记得", "忘记", "帮助", "给", "展示", "打开", "关闭", "开始", "完成"
+]
+
+
+# Spanish words for random word pair generation
 SPANISH_NOUNS = [
     "gato", "perro", "casa", "coche", "árbol", "teléfono", "libro", "silla", "mesa", "computadora",
     "café", "pizza", "plátano", "manzana", "naranja", "agua", "fuego", "hielo", "sol", "luna",
@@ -69,15 +130,47 @@ SPANISH_NOUNS = [
     "guitarra", "piano", "tambor", "violín", "trompeta", "flauta", "saxofón", "micrófono", "altavoz",
     "fútbol", "baloncesto", "tenis", "golf", "béisbol", "hockey", "natación", "esquí", "surf",
     "avión", "helicóptero", "submarino", "cohete", "nave espacial", "bicicleta", "motocicleta", "barco", "tren"
+    # ----- new nouns added: in test file -----
+    "flor", "calabaza", "portátil", "nevera", "pimienta", "ropa", "cabello", "toalla", "maíz", "tomate",
+    # ----- new nouns added: others -----
+    "té", "azúcar", "sal", "arroz", "pasta", "carne de res", "sándwich", "patata", "lechuga", "champiñón",
+    "llave inglesa", "sierra", "hacha", "escritorio", "linterna", "puerta", "ventana", "cortina", "estantería",
+    "sofá", "sofá", "colchón", "almohada", "manta", "alfombra", "tapete", "gabinete", "armario",
+    "teléfono inteligente", "tableta", "monitor", "impresora", "escáner", "radio",
+    "plato", "cuenco", "taza", "botella", "vaso", "cuchillo", "tenedor", "cuchara"
+]
+
+SPANISH_VERBS = [
+    "martillar", "taladrar", "rociar", "dessembrar", "rodar", "lavar", "sacudir", "medir", "cortar",
+    "mezclar", "mover", "correr", "caminar", "saltar", "sentarse", "pararse", "acostarse", "dormir",
+    "comer", "beber", "cocinar", "hornear", "hervir", "freír", "asar", "remover", "mezclar",
+    "rebanar", "pelar", "picar", "moler", "verter", "servir", "limpiar", "secar", "doblar",
+    "planchar", "coser", "tejer", "pintar", "dibujar", "escribir", "leer", "teclear", "clicar",
+    "desplazar", "buscar", "llamar", "mensajear", "enviar", "hablar", "hablar", "escuchar",
+    "oír", "ver", "observar", "mirar", "oler", "sentir", "tocar", "ver", "tallar", "lijar",
+    "pulir", "apretar", "aflojar", "ensamblar", "desensamblar", "construir", "reparar", "arreglar",
+    "escalar", "cavar", "plantar", "regar", "barrer", "aspirar", "fregar",
+    "desempolvar", "comprar", "comprar", "vender", "pagar", "ordenar", "conducir", "montar",
+    "estacionar", "volar", "navegar", "pescar", "cazar", "trotar", "esprintar", "arrastrarse",
+    "deslizarse", "brincar", "saltarse", "arrodillarse", "estirar", "vapear", "asar", "triturar",
+    "batir", "saborear", "afeitarse", "cepillar", "vestir", "poner", "tomar", "atar",
+    "pulsar", "abotonar", "vestirse", "desvestirse", "gustar", "amar", "preferir",
+    "pensar", "saber", "decorar", "organizar", "llevar", "levantar", "empujar", "tirar",
+    "balancear", "girar", "atornillar", "desatornillar", "clavar", "alisar", "ajustar",
+    "instalar", "subir", "compartir", "viajar", "obtener", "tener", "hacer", "necesitar",
+    "querer", "desinstalar", "presionar", "esbozar", "fotografiar", "grabar", "jugar", "ver",
+    "descargar", "entender", "recordar", "olvidar", "ayudar", "dar", "mostrar", "abrir",
+    "cerrar", "iniciar", "terminar"
 ]
 
 
-def generate_random_word_pairs(nouns: list, n: int = 500, seed: int = 42) -> list:
+def generate_random_word_pairs(nouns: list, verbs: list, n: int = 500, seed: int = 42) -> list:
     """Generate n random word pairs from the given noun list."""
     random.seed(seed)
     pairs = []
     for _ in range(n):
-        w1, w2 = random.sample(nouns, 2)
+        w1 = random.sample(verbs, 1)
+        w2 = random.sample(nouns, 1)
         pairs.append((w1, w2))
     return pairs
 
@@ -205,16 +298,19 @@ def prepare_data(
     # Language-specific settings
     if language == "en":
         nouns = ENGLISH_NOUNS
+        verbs = ENGLISH_VERBS
         pair_prompt_fn = construct_pair_prompt_en
         headline_prompt_fn = construct_headline_prompt_en
         suffix = ""
     elif language == "zh":
         nouns = CHINESE_NOUNS
+        verbs = CHINESE_VERBS
         pair_prompt_fn = construct_pair_prompt_zh
         headline_prompt_fn = construct_headline_prompt_zh
         suffix = "_zh"
     elif language == "es":
         nouns = SPANISH_NOUNS
+        verbs = SPANISH_VERBS
         pair_prompt_fn = construct_pair_prompt_es
         headline_prompt_fn = construct_headline_prompt_es
         suffix = "_es"
@@ -223,7 +319,7 @@ def prepare_data(
 
     # Generate training data
     print(f"Generating {n_word_pairs} random word pair prompts for {language}...")
-    train_pairs = generate_random_word_pairs(nouns, n=n_word_pairs)
+    train_pairs = generate_random_word_pairs(nouns, verbs, n=n_word_pairs)
     pair_prompts = [pair_prompt_fn(w1, w2) for w1, w2 in train_pairs]
 
     print(f"Fetching {n_headlines} headlines from HuggingFace...")
