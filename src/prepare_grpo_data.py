@@ -211,12 +211,12 @@ def get_headlines_from_hf(language: str, n: int = 500) -> list:
     elif language == "zh":
         # Use Chinese news dataset
         try:
-            ds = load_dataset("seamew/CNews", split="train", streaming=True)
+            ds = load_dataset("jed351/rthk_news", split="train", streaming=True)
             for i, item in enumerate(ds):
                 if i >= n:
                     break
-                if "title" in item and item["title"]:
-                    headlines.append(item["title"])
+                if "headlines" in item and item["headlines"]:
+                    headlines.append(item["headlines"])
         except Exception as e:
             print(f"Could not load Chinese news: {e}")
             sample_headlines = [
