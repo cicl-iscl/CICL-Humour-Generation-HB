@@ -230,14 +230,14 @@ def get_headlines_from_hf(language: str, n: int = 500) -> list:
             headlines = headlines[:n]
 
     elif language == "es":
-        # Use Spanish news dataset (mlsum)
-        try:
-            ds = load_dataset("mlsum", "es", split="train", streaming=True)
+        # Use Spanish news dataset 
+        try: 
+            ds = load_dataset("hacktoberfest-corpus-es/colmbian_spanish_news", split="train", streaming=True)
             for i, item in enumerate(ds):
                 if i >= n:
                     break
-                if "title" in item and item["title"]:
-                    headlines.append(item["title"])
+                if "news_title" in item and item["news_title"]:
+                    headlines.append(item["news_title"])
         except Exception as e:
             print(f"Could not load Spanish news: {e}")
             sample_headlines = [
