@@ -404,6 +404,7 @@ def create_formatting_fn(language: str = "en"):
             "Sure!",
             "You're welcome!",
             "That joke",
+            "Joke:"
         ],
         "zh": [
             # original ZH
@@ -441,6 +442,7 @@ def create_formatting_fn(language: str = "en"):
             "¡Claro!",
             "¡De nada!",
             "Ese chiste",
+            "Chiste:"
         ],
     }
 

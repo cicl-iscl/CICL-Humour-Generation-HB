@@ -165,12 +165,12 @@ SPANISH_VERBS = [
 
 
 def generate_random_word_pairs(nouns: list, verbs: list, n: int = 500, seed: int = 42) -> list:
-    """Generate n random word pairs from the given noun list."""
+    """Generate n random word pairs from the given noun and verb lists."""
     random.seed(seed)
     pairs = []
     for _ in range(n):
-        w1 = random.sample(verbs, 1)
-        w2 = random.sample(nouns, 1)
+        w1 = random.choice(verbs)
+        w2 = random.choice(nouns)
         pairs.append((w1, w2))
     return pairs
 
@@ -255,27 +255,27 @@ def get_headlines_from_hf(language: str, n: int = 500) -> list:
 
 # Prompt constructors matching notebook format
 def construct_pair_prompt_en(w1: str, w2: str) -> str:
-    return f"Generate a funny joke using these two words: '{w1}', '{w2}'."
+    return f"Generate a funny joke using these two words: '{w1}', '{w2}'. Only respond with the joke and nothing else."
 
 
 def construct_headline_prompt_en(headline: str) -> str:
-    return f"Generate a funny joke related to this headline: '{headline}'."
+    return f"Generate a funny joke related to this headline: '{headline}'. Only respond with the joke and nothing else."
 
 
 def construct_pair_prompt_zh(w1: str, w2: str) -> str:
-    return f"用这两个词生成一个有趣的笑话：'{w1}'、'{w2}'。"
+    return f"用这两个词生成一个有趣的笑话：'{w1}'、'{w2}'。只回复笑话，不要回复其他内容。"
 
 
 def construct_headline_prompt_zh(headline: str) -> str:
-    return f"根据这个标题生成一个有趣的笑话：'{headline}'。"
+    return f"根据这个标题生成一个有趣的笑话：'{headline}'。只回复笑话，不要回复其他内容。"
 
 
 def construct_pair_prompt_es(w1: str, w2: str) -> str:
-    return f"Genera un chiste gracioso usando estas dos palabras: '{w1}', '{w2}'."
+    return f"Genera un chiste gracioso usando estas dos palabras: '{w1}', '{w2}'. Solo responde con el chiste y nada más."
 
 
 def construct_headline_prompt_es(headline: str) -> str:
-    return f"Genera un chiste gracioso relacionado con este titular: '{headline}'."
+    return f"Genera un chiste gracioso relacionado con este titular: '{headline}'. Solo responde con el chiste y nada más."
 
 
 def prepare_data(
