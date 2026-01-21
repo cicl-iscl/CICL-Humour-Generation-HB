@@ -15,27 +15,27 @@ from tqdm import tqdm
 
 # Prompt constructors for each language
 def construct_pair_prompt_en(w1: str, w2: str) -> str:
-    return f"Generate a funny joke using these two words: '{w1}', '{w2}'."
+    return f"Generate a funny joke using these two words: '{w1}', '{w2}'. Only respond with the joke and nothing else."
 
 
 def construct_headline_prompt_en(headline: str) -> str:
-    return f"Generate a funny joke related to this headline: '{headline}'."
+    return f"Generate a funny joke related to this headline: '{headline}'. Only respond with the joke and nothing else."
 
 
 def construct_pair_prompt_zh(w1: str, w2: str) -> str:
-    return f"用这两个词生成一个有趣的笑话：'{w1}'、'{w2}'。"
+    return f"用这两个词生成一个有趣的笑话：'{w1}'、'{w2}'。只回复笑话，不要回复其他内容。"
 
 
 def construct_headline_prompt_zh(headline: str) -> str:
-    return f"根据这个标题生成一个有趣的笑话：'{headline}'。"
+    return f"根据这个标题生成一个有趣的笑话：'{headline}'。只回复笑话，不要回复其他内容。"
 
 
 def construct_pair_prompt_es(w1: str, w2: str) -> str:
-    return f"Genera un chiste gracioso usando estas dos palabras: '{w1}', '{w2}'."
+    return f"Genera un chiste gracioso usando estas dos palabras: '{w1}', '{w2}'. Solo responde con el chiste y nada más."
 
 
 def construct_headline_prompt_es(headline: str) -> str:
-    return f"Genera un chiste gracioso relacionado con este titular: '{headline}'."
+    return f"Genera un chiste gracioso relacionado con este titular: '{headline}'. Solo responde con el chiste y nada más."
 
 
 def get_prompt_functions(language: str):
