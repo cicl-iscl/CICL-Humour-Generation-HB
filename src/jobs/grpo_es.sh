@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=GRPO_ES
+#SBATCH --job-name=GRPO_ES_7B
 #SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=18:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
@@ -42,7 +42,7 @@ python3 train_grpo.py \
     --train_data_file "$PROJECT_ROOT/data/rl_df_train_es.parquet" \
     --test_data_file "$PROJECT_ROOT/data/rl_df_test_es.parquet" \
     --joke_rater_model "KonradBRG/joke-rater-roberta-es" \
-    --num_train_epochs 2 \
+    --num_train_epochs 1 \
     --learning_rate 1e-6 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
