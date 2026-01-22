@@ -30,7 +30,7 @@ mkdir -p logs
 echo "Generating Spanish submissions..."
 
 python3 run_submissions.py \
-    --input_tsv "$PROJECT_ROOT/data/task-a-es.tsv" \
+    --input_tsv "$PROJECT_ROOT/data/evaluation/task-a-es.tsv" \
     --model_id "KonradBRG/Qwen2.5-7B-Instruct-Jokester-Spanish" \
     --language "es" \
     --output_tsv "$PROJECT_ROOT/submissions/task-a-es-submission.tsv" \

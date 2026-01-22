@@ -30,7 +30,7 @@ mkdir -p logs
 echo "Generating Chinese submissions..."
 
 python3 run_submissions.py \
-    --input_tsv "$PROJECT_ROOT/data/task-a-zh.tsv" \
+    --input_tsv "$PROJECT_ROOT/data/evaluation/task-a-zh.tsv" \
     --model_id "KonradBRG/Qwen2.5-7B-Instruct-Jokester-Chinese" \
     --language "zh" \
     --output_tsv "$PROJECT_ROOT/submissions/task-a-zh-submission.tsv" \
