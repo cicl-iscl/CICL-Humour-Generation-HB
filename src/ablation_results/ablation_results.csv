@@ -1,0 +1,5 @@
+Model,Fine-tuned,Accuracy,MAE
+xlm-roberta-large,No,0.0899,5.5803
+xlm-roberta-large,Yes,0.4320,1.4638
+mdeberta-v3-base,No,0.0899,5.5803
+mdeberta-v3-base,Yes,0.3852,1.6803
