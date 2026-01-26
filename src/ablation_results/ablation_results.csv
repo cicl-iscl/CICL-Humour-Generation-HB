@@ -1,5 +1,13 @@
-Model,Fine-tuned,Accuracy,MAE
-xlm-roberta-large,No,0.0899,5.5803
-xlm-roberta-large,Yes,0.4320,1.4638
-mdeberta-v3-base,No,0.0899,5.5803
-mdeberta-v3-base,Yes,0.3852,1.6803
+Language,Model,Fine-tuned,Accuracy,MAE
+English,xlm-roberta-large,No (frozen backbone),0.3904,1.7957
+English,xlm-roberta-large,Yes,0.4502,1.3952
+English,mdeberta-v3-base,No (frozen backbone),0.3725,1.9870
+English,mdeberta-v3-base,Yes,0.4453,1.4496
+Chinese,xlm-roberta-large,No (frozen backbone),0.5120,1.7150
+Chinese,xlm-roberta-large,Yes,0.5172,1.3162
+Chinese,mdeberta-v3-base,No (frozen backbone),0.4933,1.8525
+Chinese,mdeberta-v3-base,Yes,0.5393,1.3773
+Spanish,xlm-roberta-large,No (frozen backbone),0.6726,1.4084
+Spanish,xlm-roberta-large,Yes,0.7059,1.1079
+Spanish,mdeberta-v3-base,No (frozen backbone),0.6465,1.5742
+Spanish,mdeberta-v3-base,Yes,0.6809,1.1646
