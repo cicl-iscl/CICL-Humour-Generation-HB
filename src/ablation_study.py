@@ -3,12 +3,24 @@ Ablation study comparing HierarchicalClassifier with different backbones:
 - xlm-roberta-large (full fine-tuning vs frozen backbone)
 - mdeberta-v3-base (full fine-tuning vs frozen backbone)
 
+Supports per-language ablation:
+- en: English jokes
+- zh: Chinese jokes
+- es: Spanish jokes
+- all: Run ablation for all three languages
+
 For a fair comparison:
 - Full fine-tuning: Train entire model with low LR (2e-5), 10 epochs
 - Frozen backbone: Freeze transformer, train only classification head
   with higher LR (1e-3), more epochs (20), no weight decay
 
-Outputs a table with Accuracy and MAE on the test split.
+Usage:
+    python ablation_study.py --language en
+    python ablation_study.py --language zh
+    python ablation_study.py --language es
+    python ablation_study.py --language all  # Run for all languages
+
+Outputs a table with Language, Model, Accuracy and MAE on the test split.
 """
 
 import argparse
@@ -32,6 +44,19 @@ from joke_rater.modeling_custom import (
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Ablation study for joke rater models")
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="all",
+        choices=["en", "zh", "es", "all"],
+        help="Language to run ablation for: en, zh, es, or all (default: all)",
+    )
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default="../data",
+        help="Directory containing the data files",
+    )
     parser.add_argument(
         "--num_epochs",
         type=int,
@@ -106,9 +131,10 @@ def get_cross_entropy_weights(train_ds):
     return binary_weights.tolist(), child_weights.tolist()
 
 
-def prepare_datasets(model_name: str):
-    """Load and tokenize datasets for a given model."""
-    eval_df = build_joke_dataset()
+def prepare_datasets(model_name: str, language: str = "all", data_dir: str = "../data"):
+    """Load and tokenize datasets for a given model and language."""
+    eval_df = build_joke_dataset(language=language, data_dir=data_dir)
+    print(f"Loaded {len(eval_df)} jokes for language: {language}")
     train_ds, test_ds, val_ds, train_df = get_train_test_split(eval_df)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -258,9 +284,11 @@ def train_and_evaluate(
     return results.metrics
 
 
-def run_ablation(args):
-    """Run the full ablation study."""
+def run_ablation_for_language(args, language: str):
+    """Run ablation study for a single language."""
     results = []
+
+    lang_name = {"en": "English", "zh": "Chinese", "es": "Spanish", "all": "Multilingual"}[language]
 
     # Model configurations
     configs = [
@@ -278,20 +306,26 @@ def run_ablation(args):
 
     for config in configs:
         print(f"\n{'='*60}")
-        print(f"Processing: {config['name']}")
+        print(f"Processing: {config['name']} ({lang_name})")
         print("=" * 60)
 
-        # Prepare datasets
-        datasets, tokenizer, train_df = prepare_datasets(config["model_id"])
+        # Prepare datasets for this language
+        datasets, tokenizer, train_df = prepare_datasets(
+            config["model_id"],
+            language=language,
+            data_dir=args.data_dir,
+        )
         binary_weights, child_weights = get_cross_entropy_weights(datasets["train"])
-        n_labels = len(train_df.labels.unique())
+
+        # Always use 10 child labels for consistent architecture
+        n_child_labels = 10
 
         # --- Frozen Backbone (train head only) ---
         print(f"\n[{config['name']}] Training with FROZEN backbone (head-only)...")
         print(f"  Using LR={args.learning_rate_frozen}, epochs={args.num_epochs_frozen}")
         model_frozen = config["model_class"].from_pretrained(
             config["model_id"],
-            num_child_labels=n_labels - 1,
+            num_child_labels=n_child_labels,
             class_weights_binary=binary_weights,
             class_weights_child=child_weights,
         )
@@ -303,10 +337,11 @@ def run_ablation(args):
             num_epochs=args.num_epochs_frozen,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate_frozen,
-            output_dir=f"{args.output_dir}/{config['name'].replace('/', '_')}_frozen",
+            output_dir=f"{args.output_dir}/{language}/{config['name'].replace('/', '_')}_frozen",
         )
 
         results.append({
+            "Language": lang_name,
             "Model": config["name"],
             "Fine-tuned": "No (frozen backbone)",
             "Accuracy": f"{metrics_frozen['test_accuracy']:.4f}",
@@ -321,7 +356,7 @@ def run_ablation(args):
         print(f"\n[{config['name']}] Training WITH fine-tuning...")
         model_ft = config["model_class"].from_pretrained(
             config["model_id"],
-            num_child_labels=n_labels - 1,
+            num_child_labels=n_child_labels,
             class_weights_binary=binary_weights,
             class_weights_child=child_weights,
         )
@@ -333,10 +368,11 @@ def run_ablation(args):
             num_epochs=args.num_epochs,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate,
-            output_dir=f"{args.output_dir}/{config['name'].replace('/', '_')}_finetuned",
+            output_dir=f"{args.output_dir}/{language}/{config['name'].replace('/', '_')}_finetuned",
         )
 
         results.append({
+            "Language": lang_name,
             "Model": config["name"],
             "Fine-tuned": "Yes",
             "Accuracy": f"{metrics_ft['test_accuracy']:.4f}",
@@ -347,19 +383,40 @@ def run_ablation(args):
         del model_ft
         torch.cuda.empty_cache()
 
-    # Print results table
+    return results
+
+
+def run_ablation(args):
+    """Run the full ablation study for specified language(s)."""
+    all_results = []
+
+    # Determine which languages to run
+    if args.language == "all":
+        languages = ["en", "zh", "es"]
+    else:
+        languages = [args.language]
+
+    for language in languages:
+        print(f"\n{'#'*60}")
+        print(f"# ABLATION STUDY FOR: {language.upper()}")
+        print(f"{'#'*60}")
+
+        results = run_ablation_for_language(args, language)
+        all_results.extend(results)
+
+    # Print combined results table
     print("\n" + "=" * 60)
     print("ABLATION STUDY RESULTS")
     print("=" * 60)
-    print(tabulate(results, headers="keys", tablefmt="github"))
+    print(tabulate(all_results, headers="keys", tablefmt="github"))
 
     # Save results to CSV
     import pandas as pd
-    results_df = pd.DataFrame(results)
+    results_df = pd.DataFrame(all_results)
     results_df.to_csv(f"{args.output_dir}/ablation_results.csv", index=False)
     print(f"\nResults saved to {args.output_dir}/ablation_results.csv")
 
-    return results
+    return all_results
 
 
 if __name__ == "__main__":
