@@ -81,13 +81,15 @@ def compute_metrics(eval_pred):
 
 
 def get_cross_entropy_weights(train_ds):
-    """Calculate class weights for imbalanced data."""
+    """Calculate class weights for imbalanced data.
+
+    Returns Python lists (JSON serializable) - the model converts them to tensors internally.
+    """
     labels = np.array(train_ds["labels"])
 
     # Binary weights (0 vs 1-10)
     binary_counts = np.array([(labels == 0).sum(), (labels != 0).sum()], dtype=float)
     binary_weights = binary_counts.sum() / (2 * binary_counts)
-    binary_weights = torch.tensor(binary_weights, dtype=torch.float)
 
     # Child weights (1 to 10)
     child_labels = labels[labels != 0]
@@ -99,9 +101,9 @@ def get_cross_entropy_weights(train_ds):
     # Avoid division by zero
     child_counts = np.maximum(child_counts, 1)
     child_weights = child_counts.sum() / (num_child_classes * child_counts)
-    child_weights = torch.tensor(child_weights, dtype=torch.float)
 
-    return binary_weights, child_weights
+    # Return as lists (JSON serializable) - model converts to tensors internally
+    return binary_weights.tolist(), child_weights.tolist()
 
 
 def prepare_datasets(model_name: str):
