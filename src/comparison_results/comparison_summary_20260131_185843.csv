@@ -1,0 +1,7 @@
+language,model,model_id,mean_reward,median_reward,std_reward,validity_rate,num_samples
+en,base,Qwen/Qwen2.5-7B-Instruct,7.333333333333333,8.0,1.398994833565338,0.9858333333333333,1200
+en,trained,KonradBRG/Qwen2.5-7B-Instruct-Jokester-English,7.31,8.0,1.5956257972147734,0.9791666666666666,1200
+zh,base,Qwen/Qwen2.5-7B-Instruct,6.168,8.0,3.0051300815117483,0.824,1000
+zh,trained,KonradBRG/Qwen2.5-7B-Instruct-Jokester-Chinese,6.377,8.0,2.8542981655773136,0.843,1000
+es,base,Qwen/Qwen2.5-7B-Instruct,7.16,8.0,1.9280814077546382,0.9758333333333333,1200
+es,trained,KonradBRG/Qwen2.5-7B-Instruct-Jokester-Spanish,7.391666666666667,8.0,1.705585356036991,0.9791666666666666,1200
