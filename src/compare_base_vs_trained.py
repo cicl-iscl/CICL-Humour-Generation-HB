@@ -82,7 +82,7 @@ def parse_args():
     parser.add_argument(
         "--temperature",
         type=float,
-        default=0.7,
+        default=0.8,
         help="Generation temperature",
     )
     parser.add_argument(

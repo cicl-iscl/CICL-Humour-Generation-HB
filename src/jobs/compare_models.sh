@@ -39,7 +39,7 @@ python3 compare_base_vs_trained.py \
     --data_dir "$PROJECT_ROOT/data" \
     --output_dir "./comparison_results" \
     --max_new_tokens 128 \
-    --temperature 0.7 \
+    --temperature 0.8 \
     --batch_size 4
 
 if [ $? -eq 0 ]; then
