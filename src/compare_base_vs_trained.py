@@ -2,24 +2,32 @@
 Compare mean reward scores of base Qwen2.5-7B-Instruct vs GRPO-trained models
 on the test set for each language (en, zh, es).
 
-For each language:
-1. Load test prompts from the parquet test set
-2. Generate jokes with base model and trained model
-3. Score all jokes with the language-specific RoBERTa reward model
-4. Report mean reward comparison
+Uses the same composite reward used during GRPO training (not just argmax class),
+including expected-value RoBERTa scoring for finer granularity.
 """
 
 import argparse
 import os
-import json
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+)
 
-from grpo.rewards import create_roberta_score_fn, create_is_valid_single_joke_fn
+from grpo.rewards import (
+    create_is_valid_single_joke_fn,
+    create_formatting_fn,
+    create_length_penalty_fn,
+    create_coherence_penalty_fn,
+    word_pair_prompt_adherence,
+)
 
 
 LANG_CONFIG = {
@@ -53,50 +61,25 @@ def parse_args():
         nargs="+",
         default=["en", "zh", "es"],
         choices=["en", "zh", "es"],
-        help="Languages to evaluate",
     )
+    parser.add_argument("--data_dir", type=str, default="../data")
+    parser.add_argument("--output_dir", type=str, default="./comparison_results")
+    parser.add_argument("--num_samples", type=int, default=None)
+    parser.add_argument("--max_new_tokens", type=int, default=128)
+    parser.add_argument("--temperature", type=float, default=0.8)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument(
-        "--data_dir",
-        type=str,
-        default="../data",
-        help="Directory containing test parquet files",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default="./comparison_results",
-        help="Directory to save results",
-    )
-    parser.add_argument(
-        "--num_samples",
+        "--reward_batch_size",
         type=int,
-        default=None,
-        help="Number of test samples to use (None = all)",
-    )
-    parser.add_argument(
-        "--max_new_tokens",
-        type=int,
-        default=128,
-        help="Maximum tokens to generate",
-    )
-    parser.add_argument(
-        "--temperature",
-        type=float,
-        default=0.8,
-        help="Generation temperature",
-    )
-    parser.add_argument(
-        "--batch_size",
-        type=int,
-        default=4,
-        help="Batch size for generation",
+        default=32,
+        help="Batch size for reward model scoring",
     )
     return parser.parse_args()
 
 
-def load_model(model_id: str):
+def load_generative_model(model_id: str):
     """Load a causal LM and tokenizer."""
-    print(f"Loading model: {model_id}")
+    print(f"Loading generative model: {model_id}")
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
@@ -111,8 +94,65 @@ def load_model(model_id: str):
     return model, tokenizer
 
 
+def load_reward_model(model_id: str, device: str = "cuda"):
+    """Load the RoBERTa reward model directly (not via pipeline)."""
+    print(f"Loading reward model: {model_id}")
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id, use_fast=True, trust_remote_code=True
+    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_id, trust_remote_code=True
+    )
+    model = model.to(device).eval()
+    return model, tokenizer
+
+
+def score_expected_value(
+    reward_model,
+    reward_tokenizer,
+    texts: list[str],
+    batch_size: int = 32,
+    device: str = "cuda",
+) -> list[float]:
+    """
+    Score texts using expected value E[score] = sum(p_i * i) for i in 0..10.
+
+    This gives a continuous score rather than the coarse argmax class,
+    making differences between base and trained models visible.
+    """
+    all_scores = []
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i : i + batch_size]
+        inputs = reward_tokenizer(
+            batch,
+            padding=True,
+            truncation=True,
+            max_length=512,
+            return_tensors="pt",
+        ).to(device)
+
+        with torch.no_grad():
+            outputs = reward_model(**inputs)
+            logits = outputs["logits"]  # [batch, 11] for classes 0-10
+            probs = F.softmax(logits, dim=-1)
+            # Expected value: sum(p_i * i) for i in 0..10
+            class_indices = torch.arange(
+                logits.size(-1), device=device, dtype=torch.float
+            )
+            expected = (probs * class_indices).sum(dim=-1)
+            all_scores.extend(expected.cpu().tolist())
+
+    return all_scores
+
+
 def generate_jokes(
-    model, tokenizer, prompts: list[str], max_new_tokens: int, temperature: float, batch_size: int
+    model,
+    tokenizer,
+    prompts: list[str],
+    max_new_tokens: int,
+    temperature: float,
+    batch_size: int,
 ) -> list[str]:
     """Generate one joke per prompt."""
     device = next(model.parameters()).device
@@ -152,56 +192,130 @@ def generate_jokes(
     return all_jokes
 
 
+def compute_composite_reward(
+    jokes: list[str],
+    prompts: list[str],
+    ev_scores: list[float],
+    lang: str,
+) -> list[float]:
+    """
+    Compute the same composite reward used during GRPO training.
+
+    Weights match train_grpo.py:
+      roberta: 1.0, word_pair: 2.0, formatting: 0.5, length: 0.5, coherence: 0.5
+    (structure_diversity and headline_adherence omitted as they depend on
+    generation order / are minor)
+    """
+    validator = create_is_valid_single_joke_fn(lang)
+    formatting_fn = create_formatting_fn(lang)
+    length_fn = create_length_penalty_fn(lang)
+    coherence_fn = create_coherence_penalty_fn(lang)
+
+    # Compute sub-rewards
+    fmt_scores = formatting_fn(jokes)
+    len_scores = length_fn(jokes)
+    coh_scores = coherence_fn(jokes)
+    wp_scores = word_pair_prompt_adherence(jokes, prompts)
+
+    composite = []
+    for i in range(len(jokes)):
+        # RoBERTa EV score (gated by validity like in training)
+        if validator(jokes[i]):
+            r = ev_scores[i]
+        else:
+            r = 0.0
+
+        wp = wp_scores[i] if wp_scores[i] is not None else 0.0
+
+        total = (
+            1.0 * r
+            + 2.0 * wp
+            + 0.5 * fmt_scores[i]
+            + 0.5 * len_scores[i]
+            + 0.5 * coh_scores[i]
+        )
+        composite.append(total)
+
+    return composite
+
+
 def evaluate_language(lang: str, args):
-    """Run base vs trained comparison for one language. Returns dict of results."""
+    """Run base vs trained comparison for one language."""
     config = LANG_CONFIG[lang]
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load test prompts
     test_path = os.path.join(args.data_dir, config["test_data"])
     print(f"\n{'='*60}")
     print(f"Language: {lang.upper()}")
-    print(f"Loading test data: {test_path}")
+    print(f"{'='*60}")
     test_df = pd.read_parquet(test_path)
     prompts = test_df["prompt"].tolist()
     if args.num_samples:
         prompts = prompts[: args.num_samples]
     print(f"Using {len(prompts)} prompts")
 
-    # Create reward scorer
-    reward_fn = create_roberta_score_fn(config["reward_model"], language=lang)
+    # Load reward model once for this language
+    reward_model, reward_tokenizer = load_reward_model(config["reward_model"], device)
     validator = create_is_valid_single_joke_fn(lang)
 
     results = {}
     for label, model_id in [("base", BASE_MODEL), ("trained", config["trained_model"])]:
-        print(f"\n--- {label} model: {model_id} ---")
-        model, tokenizer = load_model(model_id)
+        print(f"\n--- {label}: {model_id} ---")
+        gen_model, gen_tokenizer = load_generative_model(model_id)
         jokes = generate_jokes(
-            model, tokenizer, prompts,
-            args.max_new_tokens, args.temperature, args.batch_size,
+            gen_model,
+            gen_tokenizer,
+            prompts,
+            args.max_new_tokens,
+            args.temperature,
+            args.batch_size,
         )
 
-        # Score
-        print("Scoring with reward model...")
-        scores = reward_fn(jokes)
+        # Free generative model before scoring
+        del gen_model
+        torch.cuda.empty_cache()
+
+        # Score with expected value
+        print("Scoring with reward model (expected value)...")
+        ev_scores = score_expected_value(
+            reward_model, reward_tokenizer, jokes, args.reward_batch_size, device
+        )
+
+        # Compute composite reward (mirrors GRPO training)
+        composite_scores = compute_composite_reward(jokes, prompts, ev_scores, lang)
+
+        # Validity
         validity = [validator(j) for j in jokes]
+
+        # Argmax scores for comparison
+        argmax_scores = []
+        for s, v in zip(ev_scores, validity):
+            argmax_scores.append(s if v else 0.0)
 
         results[label] = {
             "model_id": model_id,
-            "mean_reward": sum(scores) / len(scores),
-            "median_reward": sorted(scores)[len(scores) // 2],
-            "std_reward": pd.Series(scores).std(),
-            "validity_rate": sum(validity) / len(validity),
+            "mean_ev_reward": np.mean(ev_scores),
+            "mean_ev_reward_valid_only": np.mean(
+                [s for s, v in zip(ev_scores, validity) if v]
+            ) if any(validity) else 0.0,
+            "mean_composite_reward": np.mean(composite_scores),
+            "std_composite_reward": np.std(composite_scores),
+            "validity_rate": np.mean(validity),
             "num_samples": len(prompts),
             "jokes": jokes,
-            "scores": scores,
+            "ev_scores": ev_scores,
+            "composite_scores": composite_scores,
         }
 
-        print(f"  Mean reward: {results[label]['mean_reward']:.4f}")
-        print(f"  Validity:    {results[label]['validity_rate']:.2%}")
+        print(f"  EV reward (all):        {results[label]['mean_ev_reward']:.4f}")
+        print(f"  EV reward (valid only):  {results[label]['mean_ev_reward_valid_only']:.4f}")
+        print(f"  Composite reward:        {results[label]['mean_composite_reward']:.4f}")
+        print(f"  Validity rate:           {results[label]['validity_rate']:.2%}")
 
-        # Free GPU memory before loading next model
-        del model
-        torch.cuda.empty_cache()
+    # Free reward model
+    del reward_model
+    torch.cuda.empty_cache()
 
     return results
 
@@ -224,9 +338,10 @@ def main():
                 "language": lang,
                 "model": label,
                 "model_id": r["model_id"],
-                "mean_reward": r["mean_reward"],
-                "median_reward": r["median_reward"],
-                "std_reward": r["std_reward"],
+                "mean_ev_reward": r["mean_ev_reward"],
+                "mean_ev_reward_valid_only": r["mean_ev_reward_valid_only"],
+                "mean_composite_reward": r["mean_composite_reward"],
+                "std_composite_reward": r["std_composite_reward"],
                 "validity_rate": r["validity_rate"],
                 "num_samples": r["num_samples"],
             })
@@ -241,35 +356,46 @@ def main():
     for lang, lang_results in all_results.items():
         for label in ["base", "trained"]:
             r = lang_results[label]
-            for joke, score in zip(r["jokes"], r["scores"]):
+            for joke, ev, comp in zip(
+                r["jokes"], r["ev_scores"], r["composite_scores"]
+            ):
                 detail_rows.append({
                     "language": lang,
                     "model": label,
                     "joke": joke,
-                    "reward": score,
+                    "ev_reward": ev,
+                    "composite_reward": comp,
                 })
     detail_df = pd.DataFrame(detail_rows)
     detail_path = os.path.join(args.output_dir, f"comparison_detailed_{timestamp}.csv")
     detail_df.to_csv(detail_path, index=False)
 
-    # Print final summary table
+    # Print final summary
     print(f"\n{'='*60}")
     print("COMPARISON SUMMARY")
     print("=" * 60)
-    print(summary_df.to_string(index=False))
+    display_cols = [
+        "language", "model", "mean_ev_reward", "mean_composite_reward",
+        "validity_rate",
+    ]
+    print(summary_df[display_cols].to_string(index=False))
 
-    # Print improvement
     print(f"\n{'='*60}")
     print("IMPROVEMENT (trained - base)")
     print("=" * 60)
     for lang in args.languages:
-        base_mean = all_results[lang]["base"]["mean_reward"]
-        trained_mean = all_results[lang]["trained"]["mean_reward"]
-        delta = trained_mean - base_mean
-        print(f"  {lang.upper()}: {base_mean:.4f} -> {trained_mean:.4f}  (delta: {delta:+.4f})")
+        b = all_results[lang]["base"]
+        t = all_results[lang]["trained"]
+        d_ev = t["mean_ev_reward"] - b["mean_ev_reward"]
+        d_comp = t["mean_composite_reward"] - b["mean_composite_reward"]
+        d_val = t["validity_rate"] - b["validity_rate"]
+        print(f"  {lang.upper()}:")
+        print(f"    EV reward:        {b['mean_ev_reward']:.4f} -> {t['mean_ev_reward']:.4f}  ({d_ev:+.4f})")
+        print(f"    Composite reward: {b['mean_composite_reward']:.4f} -> {t['mean_composite_reward']:.4f}  ({d_comp:+.4f})")
+        print(f"    Validity rate:    {b['validity_rate']:.2%} -> {t['validity_rate']:.2%}  ({d_val:+.2%})")
 
-    print(f"\nSummary saved to: {summary_path}")
-    print(f"Detailed results saved to: {detail_path}")
+    print(f"\nSummary: {summary_path}")
+    print(f"Details: {detail_path}")
 
 
 if __name__ == "__main__":

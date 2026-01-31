@@ -16,19 +16,31 @@ from datetime import datetime
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+)
 from peft import PeftModel
 
 from grpo.rewards import (
-    roberta_score,
     extract_joke_structure,
-    is_valid_single_joke,
+    extract_joke_structure_zh,
+    extract_joke_structure_es,
+    create_is_valid_single_joke_fn,
     word_pair_prompt_adherence,
-    formatting,
-    length_penalty,
-    coherence_penalty,
+    create_formatting_fn,
+    create_length_penalty_fn,
+    create_coherence_penalty_fn,
 )
+
+REWARD_MODELS = {
+    "en": "KonradBRG/joke-rater-roberta-en",
+    "zh": "KonradBRG/joke-rater-roberta-zh",
+    "es": "KonradBRG/joke-rater-roberta-es",
+}
 
 
 def parse_args():
@@ -82,7 +94,7 @@ def parse_args():
     parser.add_argument(
         "--temperature",
         type=float,
-        default=0.7,
+        default=0.8,
         help="Generation temperature",
     )
     parser.add_argument(
@@ -90,6 +102,19 @@ def parse_args():
         type=int,
         default=4,
         help="Batch size for generation",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="en",
+        choices=["en", "zh", "es"],
+        help="Language for reward functions and structure extraction",
+    )
+    parser.add_argument(
+        "--reward_batch_size",
+        type=int,
+        default=32,
+        help="Batch size for reward model scoring",
     )
     return parser.parse_args()
 
@@ -142,7 +167,7 @@ def generate_jokes(
     prompts: list[str],
     num_generations: int = 1,
     max_new_tokens: int = 128,
-    temperature: float = 0.7,
+    temperature: float = 0.8,
     batch_size: int = 4,
 ) -> list[list[str]]:
     """Generate jokes for a list of prompts."""
@@ -206,12 +231,71 @@ def compute_distinct_n(texts: list[str], n: int = 2) -> float:
     return len(set(all_ngrams)) / len(all_ngrams)
 
 
-def compute_structure_diversity(jokes: list[str]) -> dict:
+def get_structure_extractor(language: str):
+    """Get the appropriate joke structure extractor for a language."""
+    if language == "zh":
+        return extract_joke_structure_zh
+    elif language == "es":
+        return extract_joke_structure_es
+    return extract_joke_structure
+
+
+def compute_structure_diversity(jokes: list[str], language: str = "en") -> dict:
     """Compute joke structure distribution."""
-    structures = [extract_joke_structure(joke) for joke in jokes]
+    extractor = get_structure_extractor(language)
+    structures = [extractor(joke) for joke in jokes]
     counter = Counter(structures)
     total = len(structures)
     return {k: v / total for k, v in counter.items()}
+
+
+def load_reward_model(model_id: str, device: str = "cuda"):
+    """Load the RoBERTa reward model directly for expected-value scoring."""
+    print(f"Loading reward model: {model_id}")
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id, use_fast=True, trust_remote_code=True
+    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_id, trust_remote_code=True
+    )
+    model = model.to(device).eval()
+    return model, tokenizer
+
+
+def score_expected_value(
+    reward_model,
+    reward_tokenizer,
+    texts: list[str],
+    batch_size: int = 32,
+    device: str = "cuda",
+) -> list[float]:
+    """
+    Score texts using expected value E[score] = sum(p_i * i) for i in 0..10.
+    Gives a continuous score rather than the coarse argmax class.
+    """
+    all_scores = []
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i : i + batch_size]
+        inputs = reward_tokenizer(
+            batch,
+            padding=True,
+            truncation=True,
+            max_length=512,
+            return_tensors="pt",
+        ).to(device)
+
+        with torch.no_grad():
+            outputs = reward_model(**inputs)
+            logits = outputs["logits"]  # [batch, 11] for classes 0-10
+            probs = F.softmax(logits, dim=-1)
+            class_indices = torch.arange(
+                logits.size(-1), device=device, dtype=torch.float
+            )
+            expected = (probs * class_indices).sum(dim=-1)
+            all_scores.extend(expected.cpu().tolist())
+
+    return all_scores
 
 
 def evaluate_model(
@@ -219,10 +303,21 @@ def evaluate_model(
     tokenizer,
     prompts: list[str],
     model_name: str,
+    reward_model,
+    reward_tokenizer,
     args,
 ) -> pd.DataFrame:
     """Evaluate a single model on all prompts."""
     print(f"\nEvaluating: {model_name}")
+    lang = args.language
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Language-aware functions
+    is_valid = create_is_valid_single_joke_fn(lang)
+    formatting_fn = create_formatting_fn(lang)
+    length_fn = create_length_penalty_fn(lang)
+    coherence_fn = create_coherence_penalty_fn(lang)
+    structure_fn = get_structure_extractor(lang)
 
     # Generate jokes
     all_generations = generate_jokes(
@@ -242,17 +337,19 @@ def evaluate_model(
     ]
 
     # Compute metrics
-    print("  Computing RoBERTa scores...")
-    roberta_scores = roberta_score(all_jokes)
+    print("  Computing RoBERTa scores (expected value)...")
+    roberta_scores = score_expected_value(
+        reward_model, reward_tokenizer, all_jokes, args.reward_batch_size, device
+    )
 
     print("  Computing reward metrics...")
     word_pair_scores = word_pair_prompt_adherence(all_jokes, all_prompts_expanded)
-    formatting_scores = formatting(all_jokes)
-    length_scores = length_penalty(all_jokes)
-    coherence_scores = coherence_penalty(all_jokes)
+    formatting_scores = formatting_fn(all_jokes)
+    length_scores = length_fn(all_jokes)
+    coherence_scores = coherence_fn(all_jokes)
 
     # Validity check
-    validity = [is_valid_single_joke(joke) for joke in all_jokes]
+    validity = [is_valid(joke) for joke in all_jokes]
 
     # Build results dataframe
     results = []
@@ -273,7 +370,7 @@ def evaluate_model(
                     "coherence_score": coherence_scores[idx],
                     "is_valid": validity[idx],
                     "word_count": len(joke.split()),
-                    "structure": extract_joke_structure(joke),
+                    "structure": structure_fn(joke),
                 }
             )
             idx += 1
@@ -281,7 +378,7 @@ def evaluate_model(
     return pd.DataFrame(results)
 
 
-def compute_summary_stats(df: pd.DataFrame) -> pd.DataFrame:
+def compute_summary_stats(df: pd.DataFrame, language: str = "en") -> pd.DataFrame:
     """Compute summary statistics per model."""
     summary = []
 
@@ -293,7 +390,7 @@ def compute_summary_stats(df: pd.DataFrame) -> pd.DataFrame:
             "model": model_name,
             "n_prompts": model_df["prompt_idx"].nunique(),
             "n_generations": len(model_df),
-            # RoBERTa scores
+            # RoBERTa scores (expected value)
             "roberta_mean": model_df["roberta_score"].mean(),
             "roberta_std": model_df["roberta_score"].std(),
             "roberta_median": model_df["roberta_score"].median(),
@@ -314,7 +411,7 @@ def compute_summary_stats(df: pd.DataFrame) -> pd.DataFrame:
         }
 
         # Add structure distribution
-        structure_dist = compute_structure_diversity(all_jokes)
+        structure_dist = compute_structure_diversity(all_jokes, language)
         for struct, ratio in structure_dist.items():
             stats[f"structure_{struct}"] = ratio
 
@@ -325,6 +422,7 @@ def compute_summary_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     args = parse_args()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -339,6 +437,10 @@ def main():
         prompts = prompts[: args.num_samples]
         print(f"Using {len(prompts)} samples")
 
+    # Load reward model once (language-specific)
+    reward_model_id = REWARD_MODELS[args.language]
+    reward_model, reward_tokenizer = load_reward_model(reward_model_id, device)
+
     # Set model names
     model_names = args.model_names if args.model_names else args.models
     if len(model_names) != len(args.models):
@@ -351,18 +453,25 @@ def main():
     all_results = []
     for model_path, model_name in zip(args.models, model_names):
         model, tokenizer = load_model_and_tokenizer(model_path)
-        results_df = evaluate_model(model, tokenizer, prompts, model_name, args)
+        results_df = evaluate_model(
+            model, tokenizer, prompts, model_name,
+            reward_model, reward_tokenizer, args,
+        )
         all_results.append(results_df)
 
         # Free memory
         del model
         torch.cuda.empty_cache()
 
+    # Free reward model
+    del reward_model
+    torch.cuda.empty_cache()
+
     # Combine results
     combined_df = pd.concat(all_results, ignore_index=True)
 
     # Compute summary statistics
-    summary_df = compute_summary_stats(combined_df)
+    summary_df = compute_summary_stats(combined_df, args.language)
 
     # Save results
     detailed_path = os.path.join(args.output_dir, f"eval_detailed_{timestamp}.csv")
