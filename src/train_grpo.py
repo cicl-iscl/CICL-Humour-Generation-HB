@@ -198,6 +198,21 @@ def main():
     ]
     reward_weights = [1.0, 1.5, 2.0, 0.5, 0.5, 2.0, 0.5]
 
+    # Filter out excluded rewards
+    if args.exclude_rewards:
+        print(f"Excluding rewards: {args.exclude_rewards}")
+        filtered = [
+            (fn, name, w)
+            for fn, name, w in zip(reward_fns, reward_names, reward_weights)
+            if name not in args.exclude_rewards
+        ]
+        reward_fns, reward_names, reward_weights = (
+            [x[0] for x in filtered],
+            [x[1] for x in filtered],
+            [x[2] for x in filtered],
+        )
+        print(f"Active rewards: {reward_names}")
+
     lang_suffix = {"en": "English", "zh": "Chinese", "es": "Spanish"}[args.language]
     model_name = f"{args.model_id.split('/')[-1]}-Jokester-{lang_suffix}"
 
@@ -205,8 +220,10 @@ def main():
     sample_prompts = train_dataset["prompt"][:8]  # Take first 8 prompts for sampling
 
     # Configure GRPO Training
+    run_name = args.run_name or model_name
     training_args = GRPOConfig(
         output_dir=args.output_dir,
+        run_name=run_name,
         report_to=args.report_to,
         num_train_epochs=args.num_train_epochs,
         max_steps=args.max_steps,

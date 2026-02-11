@@ -111,5 +111,18 @@ def parse_args():
         choices=["en", "zh", "es"],
         help="Language for training: 'en' (English), 'zh' (Chinese), 'es' (Spanish).",
     )
+    parser.add_argument(
+        "--exclude_rewards",
+        type=str,
+        nargs="+",
+        default=[],
+        help="Reward names to exclude (e.g., formatting roberta_score structure_diversity).",
+    )
+    parser.add_argument(
+        "--run_name",
+        type=str,
+        default=None,
+        help="Optional wandb run name override.",
+    )
 
     return parser.parse_args()
